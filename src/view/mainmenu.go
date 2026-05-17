@@ -15,7 +15,8 @@ import (
 type CommandKind int
 
 const (
-	CmdView CommandKind = iota
+	CmdUnknown CommandKind = iota
+	CmdView
 	CmdPrompt
 	CmdAction
 )
@@ -36,6 +37,7 @@ func MainMenu(props tuix.Props) tuix.Element {
 	setFocusPrompt := props.Get("setFocusPrompt").(func(bool))
 	clearPrompt, _ := props.Get("clearPrompt").(func())
 	clearOutputs, _ := props.Get("clearOutputs").(func())
+	setPrompt, _ := props.Get("setPrompt").(func(string))
 
 	dismissMenu := func() {
 		if clearPrompt != nil {
@@ -207,14 +209,29 @@ func MainMenu(props tuix.Props) tuix.Element {
 		},
 	)
 
+	menuValues := map[string]any{
+		"items":   commandNames,
+		"visible": activeView == "",
+	}
+	if setPrompt != nil {
+		menuValues["onAutoComplete"] = func(item string) {
+			setPrompt(item)
+		}
+	}
+
 	return view.Menu(tuix.Props{
-		Values: map[string]any{
-			"items":   commandNames,
-			"visible": activeView == "",
-		},
+		Values: menuValues,
 	}, func(selected string, _ int) {
-		setFocusPrompt(false)
+		if selected == "" {
+			setFocusPrompt(true)
+			return
+		}
 		cmd := findCommand(selected) // lookup in `commands`
+		if cmd.Kind == CmdUnknown {
+			setFocusPrompt(true)
+			return
+		}
+		setFocusPrompt(false)
 		switch cmd.Kind {
 		case CmdView:
 			setActiveView(cmd.Name)

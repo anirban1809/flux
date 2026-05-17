@@ -101,7 +101,7 @@ func (s *Store) Remove(name llm.ProviderName) error {
 		return err
 	}
 
-	err := atomicWrite(content.Bytes())
+	err := AtomicWrite(config.Cfg.CredentialsPath, content.Bytes())
 
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func (s *Store) Set(name llm.ProviderName, key string) error {
 		return err
 	}
 
-	err := atomicWrite(content.Bytes())
+	err := AtomicWrite(config.Cfg.CredentialsPath, content.Bytes())
 
 	if err != nil {
 		return err

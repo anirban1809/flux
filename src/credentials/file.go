@@ -3,11 +3,12 @@ package credentials
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"zipcode/src/config"
 )
 
-func atomicWrite(contents []byte) error {
-	tmp, err := os.CreateTemp(config.Cfg.HomeDir, "credentials-temp-*.toml")
+func AtomicWrite(path string, contents []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return err
 	}
@@ -28,7 +29,7 @@ func atomicWrite(contents []byte) error {
 		return err
 	}
 
-	if err := os.Rename(tmpName, config.Cfg.CredentialsPath); err != nil {
+	if err := os.Rename(tmpName, path); err != nil {
 		os.Remove(tmpName)
 		return err
 	}

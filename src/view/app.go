@@ -34,7 +34,6 @@ func App(props tuix.Props) tuix.Element {
 	}{})
 	selectedOption, setSelectedOption := tuix.UseState("")
 	optionSelected, setOptionSelected := tuix.UseState(false)
-	// showProvidersView, setShowProvidersView := tuix.UseState(false)
 	fileDiff, setFileDiff := tuix.UseState(agent.FileChangeEvent{})
 	focusPrompt, setFocusPrompt := tuix.UseState(true)
 	planStatus, setPlanStatus := tuix.UseState(agent.PlanStatusEvent{})
@@ -42,7 +41,10 @@ func App(props tuix.Props) tuix.Element {
 
 	runtime := props.Get("runtime").(*agent.Runtime)
 
-	menuVisible := strings.HasPrefix(prompt, "/")
+	trimmed := strings.TrimSpace(prompt)
+	menuVisible := strings.HasPrefix(trimmed, "/") &&
+		!strings.ContainsAny(trimmed, " \t")
+
 	submitPrompt := func(p string) {
 		send := p
 		if name, _, ok := runtime.ParseSkillCommand(p); ok {
@@ -351,7 +353,10 @@ func App(props tuix.Props) tuix.Element {
 				}))
 				if queuedCount > 0 {
 					children = append(children, tuix.Text(
-						fmt.Sprintf("Queued prompts: %d (will run after the plan finishes)", queuedCount),
+						fmt.Sprintf(
+							"Queued prompts: %d (will run after the plan finishes)",
+							queuedCount,
+						),
 						tuix.NewStyle().Foreground(tuix.Hex("#9ad8ff")),
 					))
 				}
@@ -392,6 +397,9 @@ func App(props tuix.Props) tuix.Element {
 						"setFocusPrompt": setFocusPrompt,
 						"clearPrompt": func() {
 							setPrompt("")
+						},
+						"setPrompt": func(value string) {
+							setPrompt(value)
 						},
 						"clearOutputs": func() {
 							select {

@@ -11,22 +11,23 @@ import (
 )
 
 type Config struct {
-	Headless              bool     `toml:"headless"`
-	AppVersion            string   `toml:"app_version"`
-	ModelNames            []string `toml:"model_names"`
-	CurrentModel          string   `toml:"current_model"`
-	InternalToolPath      string   `toml:"internal_tool_path"`
-	ExternalToolPath      string   `toml:"external_tool_path"`
-	InternalSubagentsPath string   `toml:"internal_subagents_path"`
-	ExternalSubagentsPath string   `toml:"external_subagents_path"`
-	InternalSkillsPath    string   `toml:"internal_skills_path"`
-	GlobalSkillsPath      string   `toml:"global_skills_path"`
-	ProjectSkillsPath     string   `toml:"project_skills_path"`
-	SkillsStatePath       string   `toml:"skills_state_path"`
-	HomeDir               string   `toml:"home_dir"`
-	CredentialsPath       string   `toml:"credentials_path"`
-	ConfigPath            string   `toml:"config_path"`
-	ActiveProviderName    string   `toml:"active_provider_name"`
+	Headless              bool              `toml:"headless"`
+	AppVersion            string            `toml:"app_version"`
+	ModelNames            []string          `toml:"model_names"`
+	CurrentModel          string            `toml:"current_model"`
+	InternalToolPath      string            `toml:"internal_tool_path"`
+	ExternalToolPath      string            `toml:"external_tool_path"`
+	InternalSubagentsPath string            `toml:"internal_subagents_path"`
+	ExternalSubagentsPath string            `toml:"external_subagents_path"`
+	InternalSkillsPath    string            `toml:"internal_skills_path"`
+	GlobalSkillsPath      string            `toml:"global_skills_path"`
+	ProjectSkillsPath     string            `toml:"project_skills_path"`
+	SkillsStatePath       string            `toml:"skills_state_path"`
+	HomeDir               string            `toml:"home_dir"`
+	CredentialsPath       string            `toml:"credentials_path"`
+	AccountPath           string            `toml:"account_path"`
+	ConfigPath            string            `toml:"config_path"`
+	ActiveProviderName    string            `toml:"active_provider_name"`
 	ProviderModels        map[string]string `toml:"provider_models"`
 }
 

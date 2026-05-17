@@ -25,10 +25,23 @@ func Menu(
 	viewFloor, setViewFloor := tuix.UseState(0)
 	viewCeil := min(viewFloor+viewSize, len(items))
 
-	if visible {
+	var onAutoComplete func(string)
+	if cb, ok := props.Get("onAutoComplete").(func(string)); ok {
+		onAutoComplete = cb
+	}
 
+	if visible {
 		if tuix.CurrentKey.Code == tuix.KeyEnter && onChange != nil {
-			onChange(items[focussedIndex], focussedIndex)
+			if len(items) > 0 {
+				onChange(items[focussedIndex], focussedIndex)
+			} else {
+				onChange("", 0)
+			}
+		}
+
+		if tuix.CurrentKey.Code == tuix.KeyTab && onAutoComplete != nil &&
+			len(items) > 0 && focussedIndex < len(items) {
+			onAutoComplete(items[focussedIndex])
 		}
 
 		if tuix.CurrentKey.Code == tuix.KeyUp && focussedIndex > 0 {

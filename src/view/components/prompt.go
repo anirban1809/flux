@@ -28,11 +28,13 @@ func Prompt(props tuix.Props) tuix.Element {
 		tuix.NewStyle(),
 
 		tuix.Text("", tuix.NewStyle()),
-		tuix.Box(tuix.Props{Direction: tuix.Row, Padding: [4]int{1, 1, 1, 1}}, tuix.NewStyle().Background(
-			tuix.Hex("#222222"),
-		),
+		tuix.Box(
+			tuix.Props{Direction: tuix.Row, Padding: [4]int{1, 1, 1, 1}},
+			tuix.NewStyle().Background(
+				tuix.Hex("#222222"),
+			),
 			tuix.Text(marker, markerStyle),
-			tuix.Text(prompt, tuix.NewStyle()),
+			tuix.WrappedText(prompt, tuix.NewStyle()),
 		),
 	)
 }
