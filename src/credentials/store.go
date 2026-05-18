@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"time"
 	"zipcode/src/config"
@@ -47,21 +48,24 @@ func (s *Store) Load() error {
 	var cfg Config
 	_, err := toml.DecodeFile(config.Cfg.CredentialsPath, &cfg)
 
-	if err != nil {
+	switch {
+	case err == nil:
+		for name, value := range cfg.Providers {
+			providerName, err := llm.GetProviderName(name)
+			if err != nil {
+				continue
+			}
+			s.Providers[providerName] = ProviderKey{
+				APIKey:        value.APIKey,
+				Status:        value.Status,
+				LastValidated: value.LastValidated,
+			}
+			s.Source[providerName] = file
+		}
+	case errors.Is(err, os.ErrNotExist):
+		// No credentials file yet — env vars below are the only source.
+	default:
 		return err
-	}
-
-	for name, value := range cfg.Providers {
-		providerName, err := llm.GetProviderName(name)
-		if err != nil {
-			continue
-		}
-		s.Providers[providerName] = ProviderKey{
-			APIKey:        value.APIKey,
-			Status:        value.Status,
-			LastValidated: value.LastValidated,
-		}
-		s.Source[providerName] = file
 	}
 
 	//env override

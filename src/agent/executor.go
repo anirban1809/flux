@@ -141,14 +141,15 @@ func (e *Executor) SetActiveSkill(name string) {
 	e.ActiveSkill = name
 }
 
-func (e *Executor) ProcessResponse(response llm.Message) ([]ExecutionAction, ExecutionResultStatus, error) {
-	if config.Cfg.Headless {
-		utils.PrintStruct(response)
-	}
-
+func (e *Executor) ProcessResponse(
+	response llm.Message,
+) ([]ExecutionAction, ExecutionResultStatus, error) {
 	if response.ToolCalls == nil && strings.TrimSpace(response.Content) == "" {
 		return []ExecutionAction{
-			{Type: ActionMessage, Message: &llm.Message{Role: "user", Content: "retry"}},
+			{
+				Type:    ActionMessage,
+				Message: &llm.Message{Role: "user", Content: "retry"},
+			},
 		}, ExecutionSucceeded, nil
 	}
 
@@ -183,7 +184,10 @@ func (e *Executor) ProcessResponse(response llm.Message) ([]ExecutionAction, Exe
 				actionType = ActionPlan
 			}
 
-			results = append(results, ExecutionAction{Type: actionType, ToolCall: &tool})
+			results = append(
+				results,
+				ExecutionAction{Type: actionType, ToolCall: &tool},
+			)
 
 		}
 
@@ -225,7 +229,9 @@ func GetTool(path string, toolname string) (tools.Tool, error) {
 	return tool, nil
 }
 
-func (e *Executor) GetToolCallCommand(input ToolCallResponseData) (string, error) {
+func (e *Executor) GetToolCallCommand(
+	input ToolCallResponseData,
+) (string, []string, error) {
 	internaltool, err1 := GetTool(config.Cfg.InternalToolPath, input.Name)
 	externaltool, err2 := GetTool(config.Cfg.ExternalToolPath, input.Name)
 	var toolPath string
@@ -240,27 +246,60 @@ func (e *Executor) GetToolCallCommand(input ToolCallResponseData) (string, error
 	}
 
 	if err1 != nil && err2 != nil {
-		return "", errors.New("failed to get tool")
+		return "", []string{}, errors.New("failed to get tool")
 	}
 
-	command := fmt.Sprintf("python3 %s/%s/%s.py", toolPath, input.Name, input.Name)
+	command := fmt.Sprintf(
+		"python3 %s/%s/%s.py",
+		toolPath,
+		input.Name,
+		input.Name,
+	)
+
+	argValues := []string{}
 
 	for _, param := range tool.Function.Parameters.Required {
 		var args map[string]any
-
 		if err := json.Unmarshal(input.Arguments, &args); err != nil {
 			fmt.Println("Error:", err)
 		}
 
-		command = fmt.Sprintf("%s --%s \"%s\"", command, param, strings.ReplaceAll(args[param].(string), "\"", "\\\""))
+		arg := strings.ReplaceAll(args[param].(string), "\"", "\\\"")
+		argValues = append(argValues, arg)
+
+		command = fmt.Sprintf(
+			"%s --%s \"%s\"",
+			command,
+			param,
+			arg,
+		)
 	}
-	return command, nil
+
+	if input.Name == "bash" {
+		argValues = argValues[1 : len(argValues)-1]
+	} else {
+		argValues = argValues[1:]
+	}
+
+	return command, argValues, nil
 }
 
-func (e *Executor) ProcessToolCall(input ToolCallResponseData) (*ToolResultRequestData, error) {
+func (e *Executor) ProcessToolCall(
+	input ToolCallResponseData,
+) (*ToolResultRequestData, error) {
+	// toolError wraps an error as a tool-result message so the model can
+	// observe and self-correct, rather than crashing the agent loop.
+	toolError := func(format string, args ...any) *ToolResultRequestData {
+		return &ToolResultRequestData{
+			ToolCallID: input.Id,
+			Role:       "tool",
+			Content:    "error: " + fmt.Sprintf(format, args...),
+		}
+	}
+
 	switch input.Name {
 	default:
-		command, err := e.GetToolCallCommand(input)
+		command, params, err := e.GetToolCallCommand(input)
 		if err != nil {
 			return &ToolResultRequestData{
 				ToolCallID: input.Id,
@@ -274,17 +313,31 @@ func (e *Executor) ProcessToolCall(input ToolCallResponseData) (*ToolResultReque
 		var args map[string]any
 
 		if err := json.Unmarshal(input.Arguments, &args); err != nil {
-			return nil, err
+			return toolError(
+				"invalid arguments for %s: %s",
+				input.Name,
+				err,
+			), nil
 		}
 
-		e.pushEvent(Tool, args["message"].(string))
+		if msg, ok := args["message"].(string); ok {
+			e.pushEvent(
+				Tool,
+				fmt.Sprintf(
+					"%s\n      └──>%s: %s",
+					msg,
+					input.Name,
+					strings.Join(params, ","),
+				),
+			)
+		}
 
 		result, err := tools.RunBashCommand(command)
 		utils.Log(result)
 
 		if err != nil {
 			utils.Log(err.Error())
-			return nil, err
+			return toolError("%s failed: %s", input.Name, err), nil
 		}
 
 		return &ToolResultRequestData{
@@ -297,7 +350,7 @@ func (e *Executor) ProcessToolCall(input ToolCallResponseData) (*ToolResultReque
 		var fileWriteInput tools.FileWriteInput
 		err := json.Unmarshal(input.Arguments, &fileWriteInput)
 		if err != nil {
-			return nil, err
+			return toolError("invalid arguments for file_write: %s", err), nil
 		}
 
 		var msg string
@@ -354,9 +407,15 @@ func (e *Executor) ProcessToolCall(input ToolCallResponseData) (*ToolResultReque
 			output, err := tools.RunFileWrite(fileWriteInput)
 
 			if err != nil {
-				return nil, err
+				return toolError("file_write failed: %s", err), nil
 			}
 			value, err := json.Marshal(output)
+			if err != nil {
+				return toolError(
+					"file_write succeeded but result could not be encoded: %s",
+					err,
+				), nil
+			}
 
 			return &ToolResultRequestData{
 				ToolCallID: input.Id,
@@ -383,7 +442,7 @@ func (e *Executor) ProcessToolCall(input ToolCallResponseData) (*ToolResultReque
 		var questionInput tools.QuestionInput
 		err := json.Unmarshal(input.Arguments, &questionInput)
 		if err != nil {
-			return nil, err
+			return toolError("invalid arguments for question: %s", err), nil
 		}
 
 		if len(questionInput.Options) < 2 {
@@ -405,7 +464,10 @@ func (e *Executor) ProcessToolCall(input ToolCallResponseData) (*ToolResultReque
 
 		payload, err := json.Marshal(map[string]string{"selected": answer})
 		if err != nil {
-			return nil, err
+			return toolError(
+				"question result could not be encoded: %s",
+				err,
+			), nil
 		}
 
 		return &ToolResultRequestData{

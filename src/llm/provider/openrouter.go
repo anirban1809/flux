@@ -11,7 +11,6 @@ import (
 	"zipcode/src/config"
 	"zipcode/src/llm/errors"
 	"zipcode/src/tools"
-	"zipcode/src/utils"
 
 	"github.com/joho/godotenv"
 )
@@ -251,10 +250,6 @@ func (p *OpenRouterProvider) Complete(
 		if err != nil {
 			return ChatResponse{}, err
 		}
-
-		// debug code
-		utils.LogValue(request.Messages[len(request.Messages)-1])
-		// debug code
 
 		res, err := errors.RetryWithBackoff(p, func() (*http.Response, error) {
 			req, err := http.NewRequest(

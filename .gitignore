@@ -9,3 +9,5 @@ features
 
 .zipcode/sessions
 .vscode
+
+benchmark/

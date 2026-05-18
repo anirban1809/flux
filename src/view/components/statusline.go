@@ -124,9 +124,9 @@ func StatusLine(props tuix.Props) tuix.Element {
 		tuix.NewStyle(),
 		tuix.Text(
 			fmt.Sprintf(
-				"Provider: %s | Model: %s",
-				providerName,
+				"Model: %s (%s)",
 				modelName,
+				providerName,
 			),
 			tuix.NewStyle(),
 		),
