@@ -160,7 +160,10 @@ func RunFileWrite(input FileWriteInput) (FileWriteOutput, error) {
 			BytesWritten: len(text),
 		}, nil
 	default:
-		return FileWriteOutput{}, errors.New("invalid operation")
+		return FileWriteOutput{}, fmt.Errorf(
+			"unsupported operation %q (must be one of: create, replace, append, patch)",
+			input.Operation,
+		)
 	}
 
 	return FileWriteOutput{

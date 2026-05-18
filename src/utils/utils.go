@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -48,7 +47,7 @@ func HumanTime(str string) string {
 
 func PrintStruct(value any) {
 	result, _ := json.Marshal(value)
-	fmt.Println(string(result) + "\n")
+	fmt.Fprintln(os.Stderr, string(result)+"\n")
 }
 
 func If[T any](condition bool, thenValue T, elseValue T) T {
@@ -106,18 +105,16 @@ func LogValue(value any) {
 }
 
 func Log(a ...any) {
-	if config.Cfg.Headless {
-		fmt.Println(a...)
-	} else {
-		f, err := os.OpenFile("./logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer f.Close()
-		if _, err := fmt.Fprintf(f, "%s\n", a); err != nil {
-			log.Fatal(err)
-		}
+	f, err := os.OpenFile(
+		"./logs.txt",
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0644,
+	)
+	if err != nil {
+		return
 	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s\n", a)
 }
 
 func GetTool(path string, toolname string) (tools.Tool, error) {

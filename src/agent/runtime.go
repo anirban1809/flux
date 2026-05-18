@@ -29,6 +29,15 @@ const (
 // trigger a context compaction before processing the next prompt.
 const AutoCompactThreshold = 200000
 
+// traceTurn writes one breadcrumb line to stderr in headless mode so a
+// silent timeout leaves an actionable trail.
+func traceTurn(turn int, format string, args ...any) {
+	if !config.Cfg.Headless {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[zipcode] turn %d: %s\n", turn, fmt.Sprintf(format, args...))
+}
+
 const compactSummarizationPrompt = "Provide a concise but thorough summary of the conversation above. Preserve key context, decisions made, files touched, user preferences expressed, and the current state of any in-progress work. The summary will replace the full transcript so that the conversation can continue without losing context."
 
 type RuntimeEvent string
@@ -104,6 +113,9 @@ func NewRuntime(workspace *workspace.Workspace) Runtime {
 	}
 
 	if config.Cfg.ActiveProviderName != "" {
+		if canonical, err := llm.GetProviderName(config.Cfg.ActiveProviderName); err == nil {
+			config.Cfg.ActiveProviderName = string(canonical)
+		}
 		active := runtime.Registry.GetProvider(
 			llm.ProviderName(config.Cfg.ActiveProviderName),
 		)
@@ -731,7 +743,21 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 		return nil, err
 	}
 
+	turn := 0
+	maxTurns := config.Cfg.MaxHeadlessTurns
+	if maxTurns <= 0 {
+		maxTurns = 100
+	}
 	for r.Status != Idle {
+		turn++
+		if config.Cfg.Headless && turn > maxTurns {
+			traceTurn(turn, "max turns reached (%d); aborting", maxTurns)
+			return nil, fmt.Errorf(
+				"max headless turns (%d) reached without completing the task",
+				maxTurns,
+			)
+		}
+
 		lastResponseIndex := len(conv.Messages) - 1
 		lastResponse := conv.Messages[lastResponseIndex]
 		actions, status, err := r.Executor.ProcessResponse(lastResponse)
@@ -740,6 +766,24 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 
 		if err != nil {
 			return nil, err
+		}
+
+		switch {
+		case status == ExecutionCompleted:
+			traceTurn(turn, "complete (in=%d cached=%d out=%d)",
+				r.InputTokens, r.CachedInputTokens, r.OutputTokens)
+		case len(actions) == 1 && actions[0].Type == ActionMessage:
+			traceTurn(turn, "empty model response, retrying")
+		default:
+			names := make([]string, 0, len(actions))
+			for _, a := range actions {
+				kind := string(a.Type)
+				if a.ToolCall != nil {
+					kind += ":" + a.ToolCall.Name
+				}
+				names = append(names, kind)
+			}
+			traceTurn(turn, "actions=%v", names)
 		}
 
 		if status == ExecutionCompleted {
@@ -809,7 +853,14 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 
 				result, err := r.Executor.ProcessToolCall(*action.ToolCall)
 				if err != nil {
-					return nil, err
+					// Defensive net: any tool-handler that still returns
+					// (nil, err) gets surfaced to the model as a tool
+					// result instead of killing the run.
+					result = &ToolResultRequestData{
+						ToolCallID: action.ToolCall.Id,
+						Role:       "tool",
+						Content:    fmt.Sprintf("error: %s", err.Error()),
+					}
 				}
 
 				messages = append(messages, llm.Message{
@@ -874,6 +925,18 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 				Role:    "user",
 				Content: body,
 			})
+		}
+
+		// Surface tool-result errors so a model stuck in a tool-error loop
+		// is visible in the breadcrumb trail.
+		toolErrs := 0
+		for _, m := range messages {
+			if m.Role == "tool" && strings.HasPrefix(m.Content, "error:") {
+				toolErrs++
+			}
+		}
+		if toolErrs > 0 {
+			traceTurn(turn, "tool errors this turn: %d/%d", toolErrs, len(messages))
 		}
 
 		conv, err = r.Agent.RunStep(messages...)

@@ -8,6 +8,7 @@ APP_NAME       := zipcode
 CMD_DIR        := .
 BIN_DIR        := ./bin
 DIST_DIR       := ./dist
+INSTALL_DIR    := $(HOME)/.zipcode/bin
 
 GO             := go
 GOFLAGS        :=
@@ -47,6 +48,9 @@ build:
 		-ldflags "$(LDFLAGS) $(LD_META)" \
 		-o $(BIN_DIR)/$(APP_NAME) \
 		$(CMD_DIR)
+	@mkdir -p $(INSTALL_DIR)
+	@cp $(BIN_DIR)/$(APP_NAME) $(INSTALL_DIR)/$(APP_NAME)
+	@echo "installed $(APP_NAME) -> $(INSTALL_DIR)/$(APP_NAME)"
 
 # ---- Run --------------------------------------------------------------------
 .PHONY: run
