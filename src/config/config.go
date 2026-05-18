@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -15,6 +16,7 @@ type Config struct {
 	AppVersion            string            `toml:"app_version"`
 	ModelNames            []string          `toml:"model_names"`
 	CurrentModel          string            `toml:"current_model"`
+	MaxHeadlessTurns      int               `toml:"max_headless_turns"`
 	InternalToolPath      string            `toml:"internal_tool_path"`
 	ExternalToolPath      string            `toml:"external_tool_path"`
 	InternalSubagentsPath string            `toml:"internal_subagents_path"`
@@ -58,6 +60,7 @@ func defaults() *Config {
 			"z-ai/glm-5v-turbo",
 		},
 		CurrentModel:          "minimax/minimax-m2.5",
+		MaxHeadlessTurns:      100,
 		InternalToolPath:      "/Users/anirban/Documents/Code/zipcode/src/tools",
 		ExternalToolPath:      "~/.zipcode/tools",
 		InternalSubagentsPath: "/Users/anirban/Documents/Code/zipcode/src/subagents",
@@ -114,6 +117,21 @@ func Load() error {
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
+	}
+
+	// Env vars override config.toml/defaults so the binary can be pointed
+	// at a container- or sandbox-appropriate tool directory without
+	// shipping a config file.
+	if v := os.Getenv("ZIPCODE_INTERNAL_TOOL_PATH"); v != "" {
+		Cfg.InternalToolPath = v
+	}
+	if v := os.Getenv("ZIPCODE_EXTERNAL_TOOL_PATH"); v != "" {
+		Cfg.ExternalToolPath = v
+	}
+	if v := os.Getenv("ZIPCODE_MAX_HEADLESS_TURNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			Cfg.MaxHeadlessTurns = n
+		}
 	}
 
 	Cfg.expandPaths(home)
