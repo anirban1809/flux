@@ -2,6 +2,7 @@
   "type": "function",
   "function": {
     "name": "file_read",
+    "display_name":"Read",
     "description": "Read the contents of a file from the workspace. Used to inspect code before making modifications. Avoid reading extremely large files unless necessary.",
     "parameters": {
       "type": "object",

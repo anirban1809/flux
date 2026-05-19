@@ -22,12 +22,16 @@ def run() -> None:
             timeout=args.timeout_seconds
         )
 
-        print(json.dumps({
-            "ok": True,
+        payload = {
+            "ok": result.returncode == 0,
             "exit_code": result.returncode,
             "stdout": result.stdout,
             "stderr": result.stderr
-        }))
+        }
+        if result.returncode != 0:
+            payload["error"] = f"Command exited with status {result.returncode}"
+
+        print(json.dumps(payload))
 
     except subprocess.TimeoutExpired as e:
         print(json.dumps({

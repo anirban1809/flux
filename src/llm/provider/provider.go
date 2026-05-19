@@ -49,11 +49,11 @@ func GetProviderName(provider string) (ProviderName, error) {
 }
 
 type ModelDescriptor struct {
-	ID                    string
-	DisplayName           string
-	ProviderName          string
-	ContextWindow         int
-	Effort                string
+	ID            string
+	DisplayName   string
+	ProviderName  string
+	ContextWindow int
+	Effort        string
 	// USD per 1M tokens.
 	InputCostPerMillion  float64
 	OutputCostPerMillion float64
@@ -103,6 +103,7 @@ type Message struct {
 	Content    string     `json:"content"`
 	ToolCalls  []ToolCall `json:"tool_calls"`
 	ToolCallId string     `json:"tool_call_id,omitempty"`
+	Streamed   bool       `json:"-"`
 	// Usage is the API-reported token usage for the call that produced this
 	// message. Only set on assistant messages returned by the provider; nil
 	// for user/tool/system messages.
@@ -121,6 +122,7 @@ type ChatRequest struct {
 	MaxTokens   int
 	Temperature float64
 	Stream      bool
+	OnStream    func(StreamEvent)
 }
 
 type Usage struct {
@@ -134,6 +136,24 @@ type ChatResponse struct {
 	Model      string
 	Message    Message
 	StopReason string
+	Usage      Usage
+}
+
+type StreamEventType string
+
+const (
+	StreamText     StreamEventType = "text"
+	StreamToolCall StreamEventType = "tool_call"
+	StreamStop     StreamEventType = "stop"
+	StreamError    StreamEventType = "error"
+)
+
+type StreamEvent struct {
+	Type       StreamEventType
+	Content    string
+	ToolCall   *ToolCall
+	StopReason string
+	Error      string
 	Usage      Usage
 }
 

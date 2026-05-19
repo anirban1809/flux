@@ -152,6 +152,8 @@ func App(props tuix.Props) tuix.Element {
 			var acc []tuix.Element
 			var liveLocal string
 			promptIdx := -1
+			streamIdx := -1
+			var streamText string
 			for {
 				select {
 
@@ -159,6 +161,8 @@ func App(props tuix.Props) tuix.Element {
 					acc = acc[:0]
 					liveLocal = ""
 					promptIdx = -1
+					streamIdx = -1
+					streamText = ""
 					setLivePrompt("")
 					setLivePromptIdx(-1)
 					setOutputs(nil)
@@ -168,12 +172,35 @@ func App(props tuix.Props) tuix.Element {
 					liveLocal = p
 					setLivePrompt(p)
 					promptIdx = len(acc)
+					streamIdx = -1
+					streamText = ""
 					setLivePromptIdx(promptIdx)
 				case ev := <-agentOut:
 					msg := ev.Message
 					style := tuix.NewStyle().Foreground(tuix.Hex("#c8c8c8"))
 
+					if ev.EventType == agent.MessageDelta {
+						streamText += msg
+						el := tuix.Box(
+							tuix.Props{Padding: [4]int{0, 2, 0, 2}},
+							tuix.NewStyle(),
+							tuix.Markdown(streamText, style),
+						)
+						if streamIdx < 0 || streamIdx >= len(acc) {
+							streamIdx = len(acc)
+							acc = append(acc, el)
+						} else {
+							acc[streamIdx] = el
+						}
+						snap := make([]tuix.Element, len(acc))
+						copy(snap, acc)
+						setOutputs(snap)
+						continue
+					}
+
 					if ev.EventType == agent.Tool {
+						streamIdx = -1
+						streamText = ""
 
 						if ev.Question != "" {
 							setQuestionVisible(true)
@@ -212,10 +239,16 @@ func App(props tuix.Props) tuix.Element {
 								setActiveSkillName("")
 							}
 							activeSkill = ""
-							msg = fmt.Sprintf("  └──%s", msg)
+							msg = fmt.Sprintf("\n⏺ %s\n", msg)
 							style = style.Foreground(tuix.Hex("#848484"))
 						}
 					} else {
+						if ev.EventType == agent.Message ||
+							ev.EventType == agent.MessageComplete ||
+							ev.EventType == agent.Error {
+							streamIdx = -1
+							streamText = ""
+						}
 						if liveLocal != "" && promptIdx >= 0 {
 							var promptEl tuix.Element
 							if ev.EventType == agent.Error {
@@ -249,7 +282,8 @@ func App(props tuix.Props) tuix.Element {
 						}
 					}
 
-					if ev.EventType != agent.Error {
+					if ev.EventType != agent.Error &&
+						ev.EventType != agent.MessageComplete {
 						acc = append(
 							acc,
 							tuix.Box(

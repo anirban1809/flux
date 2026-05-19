@@ -13,6 +13,7 @@ import (
 
 type Config struct {
 	Headless              bool              `toml:"headless"`
+	Verbose               bool              `toml:"-"`
 	AppVersion            string            `toml:"app_version"`
 	ModelNames            []string          `toml:"model_names"`
 	CurrentModel          string            `toml:"current_model"`

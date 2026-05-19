@@ -15,6 +15,7 @@ type Tool struct {
 }
 
 type ToolFunction struct {
+	DisplayName string     `json:"display_name"`
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
 	Parameters  JSONSchema `json:"parameters"`

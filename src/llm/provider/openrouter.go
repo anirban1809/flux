@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"zipcode/src/config"
@@ -38,6 +39,7 @@ type OpenRouterRequest struct {
 	MaxCompletionTokens int                    `json:"max_completion_tokens,omitempty"`
 	Stop                []string               `json:"stop,omitempty"`
 	Stream              bool                   `json:"stream,omitempty"`
+	StreamOptions       *streamOptions         `json:"stream_options,omitempty"`
 	User                string                 `json:"user,omitempty"`
 	SessionID           string                 `json:"session_id,omitempty"`
 	Modalities          []string               `json:"modalities,omitempty"`
@@ -231,6 +233,10 @@ func (p *OpenRouterProvider) SetApiKey(key string) {
 func (p *OpenRouterProvider) Complete(
 	request ChatRequest,
 ) (ChatResponse, error) {
+	if request.Stream {
+		return p.completeStream(request)
+	}
+
 	godotenv.Load()
 
 	retry := true
@@ -299,4 +305,129 @@ func (p *OpenRouterProvider) Complete(
 	chatResponse.Message.ToolCalls = finalResponse.Choices[0].Message.ToolCalls
 
 	return chatResponse, nil
+}
+
+func (p *OpenRouterProvider) completeStream(
+	request ChatRequest,
+) (ChatResponse, error) {
+	godotenv.Load()
+
+	requestBody := OpenRouterRequest{
+		Model:               config.Cfg.CurrentModel,
+		Messages:            request.Messages,
+		Stream:              true,
+		StreamOptions:       &streamOptions{IncludeUsage: true},
+		Tools:               request.Tools,
+		MaxTokens:           8192,
+		MaxCompletionTokens: 2048,
+	}
+
+	value, err := json.Marshal(requestBody)
+	if err != nil {
+		return ChatResponse{}, err
+	}
+
+	res, err := errors.RetryWithBackoff(p, func() (*http.Response, error) {
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"https://openrouter.ai/api/v1/chat/completions",
+			bytes.NewReader(value),
+		)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set(
+			"Authorization",
+			fmt.Sprintf("Bearer %s", p.ApiKey),
+		)
+		return http.DefaultClient.Do(req)
+	})
+	if err != nil {
+		return ChatResponse{}, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 400 {
+		body, _ := io.ReadAll(res.Body)
+		return ChatResponse{}, fmt.Errorf(
+			"openrouter: status %d: %s",
+			res.StatusCode,
+			string(body),
+		)
+	}
+
+	var response ChatResponse
+	var content strings.Builder
+	role := "assistant"
+	toolCalls := map[int]*streamingToolCall{}
+
+	err = readSSE(res.Body, func(_, data string) error {
+		if data == "[DONE]" {
+			emitStream(request.OnStream, StreamEvent{
+				Type:       StreamStop,
+				StopReason: response.StopReason,
+				Usage:      response.Usage,
+			})
+			return nil
+		}
+
+		var chunk OpenRouterResponse
+		if err := decodeJSONEvent(data, &chunk); err != nil {
+			return err
+		}
+		if chunk.ID != "" {
+			response.ID = chunk.ID
+		}
+		if chunk.Model != "" {
+			response.Model = chunk.Model
+		}
+		if chunk.Usage.PromptTokens > 0 || chunk.Usage.CompletionTokens > 0 {
+			response.Usage = Usage{
+				InputTokens:       chunk.Usage.PromptTokens,
+				CachedInputTokens: chunk.Usage.PromptTokensDetails.CachedTokens,
+				OutputTokens:      chunk.Usage.CompletionTokens,
+			}
+		}
+
+		for _, choice := range chunk.Choices {
+			if choice.Delta.Role != "" {
+				role = choice.Delta.Role
+			}
+			if choice.Delta.Content != "" {
+				content.WriteString(choice.Delta.Content)
+				emitStream(request.OnStream, StreamEvent{
+					Type:    StreamText,
+					Content: choice.Delta.Content,
+				})
+			}
+			for _, tc := range choice.Delta.ToolCalls {
+				mergeToolCallDelta(toolCalls, tc)
+			}
+			if choice.FinishReason != "" {
+				response.StopReason = choice.FinishReason
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return ChatResponse{}, err
+	}
+
+	response.Message = Message{
+		Role:      role,
+		Content:   content.String(),
+		ToolCalls: finalizeToolCalls(toolCalls),
+		Streamed:  true,
+	}
+	for _, tc := range response.Message.ToolCalls {
+		call := tc
+		emitStream(request.OnStream, StreamEvent{
+			Type:     StreamToolCall,
+			ToolCall: &call,
+		})
+	}
+
+	return response, nil
 }

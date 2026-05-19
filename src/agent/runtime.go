@@ -38,30 +38,51 @@ func traceTurn(turn int, format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "[zipcode] turn %d: %s\n", turn, fmt.Sprintf(format, args...))
 }
 
+// verboseLog writes a labeled line to stderr when headless --verbose is on.
+// Used to surface every tool call, its arguments, and a result preview so
+// operators can follow what the agent is doing in a non-TUI run.
+func verboseLog(label, format string, args ...any) {
+	if !config.Cfg.Headless || !config.Cfg.Verbose {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[%s] %s\n", label, fmt.Sprintf(format, args...))
+}
+
+// truncate clips s to n runes, appending a [+N more] hint when clipped. Used
+// to keep verbose tool-result output scannable without losing the signal that
+// more data was returned.
+func truncate(s string, n int) string {
+	s = strings.ReplaceAll(s, "\n", " \\n ")
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + fmt.Sprintf("... [+%d more chars]", len(s)-n)
+}
+
 const compactSummarizationPrompt = "Provide a concise but thorough summary of the conversation above. Preserve key context, decisions made, files touched, user preferences expressed, and the current state of any in-progress work. The summary will replace the full transcript so that the conversation can continue without losing context."
 
 type RuntimeEvent string
 
 type Runtime struct {
-	Prompt          string
-	Executor        *Executor
-	Status          RuntimeStatus
-	Registry        llm.Registry
-	CurrentProvider llm.Provider
+	Prompt            string
+	Executor          *Executor
+	Status            RuntimeStatus
+	Registry          llm.Registry
+	CurrentProvider   llm.Provider
 	Workspace         *workspace.Workspace
 	Tools             []tools.Tool
 	InputTokens       int
 	CachedInputTokens int
 	OutputTokens      int
 	Conversation      llm.Conversation
-	Agent           Agent
-	Session         string
-	ChildRuntime    bool
-	SkillRegistry   *skills.SkillRegistry
-	SkillWatcher    *skills.Watcher
-	CredStore       *credentials.Store
-	Validator       credentials.Validator
-	activePlan      *Plan
+	Agent             Agent
+	Session           string
+	ChildRuntime      bool
+	SkillRegistry     *skills.SkillRegistry
+	SkillWatcher      *skills.Watcher
+	CredStore         *credentials.Store
+	Validator         credentials.Validator
+	activePlan        *Plan
 }
 
 func NewRuntime(workspace *workspace.Workspace) Runtime {
@@ -144,6 +165,9 @@ func NewRuntime(workspace *workspace.Workspace) Runtime {
 		&runtime.Registry,
 		&runtime.Validator,
 	)
+	if !config.Cfg.Headless {
+		runtime.Agent.OnStream = runtime.handleStreamEvent
+	}
 	runtime.Tools = append(
 		runtime.Tools,
 		tools.FileWriteTool,
@@ -157,6 +181,19 @@ func NewRuntime(workspace *workspace.Workspace) Runtime {
 	runtime.loadTools(config.Cfg.ExternalToolPath)
 
 	return runtime
+}
+
+func (r *Runtime) handleStreamEvent(ev llm.StreamEvent) {
+	if ev.Type != llm.StreamText || ev.Content == "" {
+		return
+	}
+	EventManager.WriteToChannel(AGENT_OUTPUT_CHANNEL, ResponseEvent{
+		EventType:    MessageDelta,
+		Message:      ev.Content,
+		SubAgent:     r.Executor.SubAgentRunning,
+		SubAgentName: r.Executor.SubAgent,
+		SkillName:    r.Executor.ActiveSkill,
+	})
 }
 
 func (r Runtime) GetExecutorEventChannel() chan ResponseEvent {
@@ -569,9 +606,13 @@ func (r *Runtime) InvokeSubAgent(
 		}, nil
 	}
 
+	verboseLog("subagent", "%s start: %s", args.AgentName, truncate(args.Task, 300))
 	r.Executor.SetSubAgentModeOn(true, args.AgentName)
 	output, err := childRuntime.Run(args.Task)
 	r.Executor.SetSubAgentModeOn(false, "")
+	if output != nil {
+		verboseLog("subagent", "%s done: %s", args.AgentName, truncate(output.Content, 500))
+	}
 	if err != nil {
 		return llm.Message{
 			Role:       "tool",
@@ -720,6 +761,8 @@ func (r *Runtime) invokeSkill(
 
 	resolved := skills.Resolve(skill.PromptTemplate, args.Args, r.Workspace)
 
+	verboseLog("skill", "%s args=%q", skill.Name, truncate(args.Args, 200))
+
 	ack := llm.Message{
 		Role:       "tool",
 		ToolCallId: tool.Id,
@@ -787,6 +830,11 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 		}
 
 		if status == ExecutionCompleted {
+			if lastResponse.Streamed && !r.ChildRuntime {
+				EventManager.WriteToChannel(AGENT_OUTPUT_CHANNEL, ResponseEvent{
+					EventType: MessageComplete,
+				})
+			}
 			if r.activePlan != nil && r.activePlan.Active {
 				cur := r.activePlan.Current
 				if cur < len(r.activePlan.Steps) {

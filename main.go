@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"zipcode/src/agent"
@@ -28,6 +29,7 @@ func main() {
 		providerFlag  string
 		modelFlag     string
 		maxTurnsFlag  int
+		verboseFlag   bool
 	)
 	flag.StringVar(&promptFlag, "prompt", "", "run a single prompt headless and exit")
 	flag.StringVar(&promptFlag, "p", "", "alias for --prompt")
@@ -36,10 +38,12 @@ func main() {
 	flag.StringVar(&providerFlag, "provider", "", "override the active provider (headless only, not persisted)")
 	flag.StringVar(&modelFlag, "model", "", "override the active model (headless only, not persisted)")
 	flag.IntVar(&maxTurnsFlag, "max-turns", 0, "headless agent-loop turn cap (0 = use config/env default)")
+	flag.BoolVar(&verboseFlag, "verbose", false, "headless: log every tool call, arguments, and result preview to stderr")
+	flag.BoolVar(&verboseFlag, "v", false, "alias for --verbose")
 	flag.Parse()
 
 	if promptFlag != "" {
-		runHeadless(promptFlag, workspaceFlag, providerFlag, modelFlag, maxTurnsFlag)
+		runHeadless(promptFlag, workspaceFlag, providerFlag, modelFlag, maxTurnsFlag, verboseFlag)
 		return
 	}
 
@@ -53,8 +57,9 @@ func main() {
 	app.Run(view.App, tuix.Props{Values: map[string]any{"runtime": &runtime, "wd": dir}})
 }
 
-func runHeadless(prompt, workspaceOverride, providerOverride, modelOverride string, maxTurnsOverride int) {
+func runHeadless(prompt, workspaceOverride, providerOverride, modelOverride string, maxTurnsOverride int, verbose bool) {
 	config.Cfg.Headless = true
+	config.Cfg.Verbose = verbose
 
 	if maxTurnsOverride > 0 {
 		config.Cfg.MaxHeadlessTurns = maxTurnsOverride
@@ -93,6 +98,16 @@ func runHeadless(prompt, workspaceOverride, providerOverride, modelOverride stri
 		}
 		dir = cwd
 	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve workspace %q: %v\n", dir, err)
+		os.Exit(1)
+	}
+	if err := os.Chdir(absDir); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to enter workspace %q: %v\n", absDir, err)
+		os.Exit(1)
+	}
+	dir = absDir
 
 	ws := workspace.Load(dir)
 	runtime := agent.NewRuntime(&ws)

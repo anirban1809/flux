@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"strings"
 	"zipcode/src/config"
 	llm "zipcode/src/llm/provider"
 	"zipcode/src/view/viewctx"
@@ -124,9 +125,9 @@ func StatusLine(props tuix.Props) tuix.Element {
 		tuix.NewStyle(),
 		tuix.Text(
 			fmt.Sprintf(
-				"Model: %s (%s)",
+				"%s/%s",
+				strings.ToLower(providerName),
 				modelName,
-				providerName,
 			),
 			tuix.NewStyle(),
 		),

@@ -1,0 +1,29 @@
+{
+  "type": "function",
+  "function": {
+    "name": "file_search",
+    "description": "Search for files within the workspace by name or pattern. Useful for locating files before inspecting them. Do not use overly broad patterns like * or *.* for file search. Be as specific as possible.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Explanation of why the file search is needed"
+        },
+        "query": {
+          "type": "string",
+          "description": "File name, path fragment, regex, or glob pattern to search for"
+        },
+        "path": {
+          "type": "string",
+          "description": "Directory path where the search should start. Use . for the workspace root."
+        }
+      },
+      "required": [
+        "message",
+        "query",
+        "path"
+      ]
+    }
+  }
+}

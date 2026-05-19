@@ -21,6 +21,8 @@ const (
 	Tool ResponseEventType = iota
 	Error
 	Message
+	MessageDelta
+	MessageComplete
 )
 
 type ResponseEvent struct {
@@ -154,7 +156,7 @@ func (e *Executor) ProcessResponse(
 	}
 
 	if response.ToolCalls == nil && strings.TrimSpace(response.Content) != "" {
-		if !e.SubAgentRunning {
+		if !e.SubAgentRunning && !response.Streamed {
 			e.pushEvent(Message, response.Content)
 		}
 		return nil, ExecutionCompleted, nil
@@ -231,7 +233,7 @@ func GetTool(path string, toolname string) (tools.Tool, error) {
 
 func (e *Executor) GetToolCallCommand(
 	input ToolCallResponseData,
-) (string, []string, error) {
+) (string, []string, string, error) {
 	internaltool, err1 := GetTool(config.Cfg.InternalToolPath, input.Name)
 	externaltool, err2 := GetTool(config.Cfg.ExternalToolPath, input.Name)
 	var toolPath string
@@ -246,7 +248,9 @@ func (e *Executor) GetToolCallCommand(
 	}
 
 	if err1 != nil && err2 != nil {
-		return "", []string{}, errors.New("failed to get tool")
+		return "", []string{}, tool.Function.DisplayName, errors.New(
+			"failed to get tool",
+		)
 	}
 
 	command := fmt.Sprintf(
@@ -281,12 +285,12 @@ func (e *Executor) GetToolCallCommand(
 		argValues = argValues[1:]
 	}
 
-	return command, argValues, nil
+	return command, argValues, tool.Function.DisplayName, nil
 }
 
 func (e *Executor) ProcessToolCall(
 	input ToolCallResponseData,
-) (*ToolResultRequestData, error) {
+) (result *ToolResultRequestData, err error) {
 	// toolError wraps an error as a tool-result message so the model can
 	// observe and self-correct, rather than crashing the agent loop.
 	toolError := func(format string, args ...any) *ToolResultRequestData {
@@ -297,9 +301,26 @@ func (e *Executor) ProcessToolCall(
 		}
 	}
 
+	verboseLog(
+		"tool",
+		"%s %s",
+		input.Name,
+		truncate(string(input.Arguments), 500),
+	)
+	defer func() {
+		if result != nil {
+			verboseLog(
+				"result",
+				"%s -> %s",
+				input.Name,
+				truncate(result.Content, 500),
+			)
+		}
+	}()
+
 	switch input.Name {
 	default:
-		command, params, err := e.GetToolCallCommand(input)
+		command, params, displayName, err := e.GetToolCallCommand(input)
 		if err != nil {
 			return &ToolResultRequestData{
 				ToolCallID: input.Id,
@@ -324,9 +345,9 @@ func (e *Executor) ProcessToolCall(
 			e.pushEvent(
 				Tool,
 				fmt.Sprintf(
-					"%s\n      └──>%s: %s",
+					"%s\n%s: %s",
 					msg,
-					input.Name,
+					displayName,
 					strings.Join(params, ","),
 				),
 			)

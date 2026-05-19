@@ -2,6 +2,7 @@
   "type": "function",
   "function": {
     "name": "bash",
+    "display_name":"Bash",
     "description": "Execute shell commands in the workspace environment. Used for inspecting the filesystem, building projects, running tests, or executing scripts. ONLY use pure bash scripts, do not use python code inside of the bash scripts",
     "parameters": {
       "type": "object",

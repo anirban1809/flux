@@ -1,0 +1,29 @@
+{
+  "type": "function",
+  "function": {
+    "name": "code_search",
+    "description": "Search inside source files for specific code patterns, symbols, or text. This tool is used to locate functions, classes, variables, imports, and configuration keys.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Explanation of why the code search is needed"
+        },
+        "query": {
+          "type": "string",
+          "description": "Code pattern, symbol, or text to search for"
+        },
+        "path": {
+          "type": "string",
+          "description": "Directory path where the search should start. Use . for the workspace root."
+        }
+      },
+      "required": [
+        "message",
+        "query",
+        "path"
+      ]
+    }
+  }
+}

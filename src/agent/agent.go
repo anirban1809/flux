@@ -18,6 +18,7 @@ type Agent struct {
 	initial      bool
 	Validator    credentials.Validator
 	Config       config.Config
+	OnStream     func(llm.StreamEvent)
 }
 
 func NewAgent(
@@ -103,6 +104,8 @@ func (a *Agent) Chat(prev *llm.Conversation) (*llm.Conversation, error) {
 	chatRequest.Messages = prev.Messages
 	chatRequest.Model = config.Cfg.CurrentModel
 	chatRequest.Tools = prev.Tools
+	chatRequest.Stream = a.OnStream != nil
+	chatRequest.OnStream = a.OnStream
 
 	currentProvider := a.Registry.GetProvider(
 		llm.ProviderName(config.Cfg.ActiveProviderName),
