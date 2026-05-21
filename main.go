@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"zipcode/src/agent"
 	"zipcode/src/config"
+	"zipcode/src/events"
 	llm "zipcode/src/llm/provider"
 	"zipcode/src/utils"
 	"zipcode/src/view"
@@ -28,18 +30,62 @@ func main() {
 		providerFlag  string
 		modelFlag     string
 		maxTurnsFlag  int
+		debugFlag     bool
+		yoloflag      bool
 	)
-	flag.StringVar(&promptFlag, "prompt", "", "run a single prompt headless and exit")
+	flag.StringVar(
+		&promptFlag,
+		"prompt",
+		"",
+		"run a single prompt headless and exit",
+	)
 	flag.StringVar(&promptFlag, "p", "", "alias for --prompt")
-	flag.StringVar(&workspaceFlag, "workspace", "", "override the working directory")
+	flag.StringVar(
+		&workspaceFlag,
+		"workspace",
+		"",
+		"override the working directory",
+	)
 	flag.StringVar(&workspaceFlag, "C", "", "alias for --workspace")
-	flag.StringVar(&providerFlag, "provider", "", "override the active provider (headless only, not persisted)")
-	flag.StringVar(&modelFlag, "model", "", "override the active model (headless only, not persisted)")
-	flag.IntVar(&maxTurnsFlag, "max-turns", 0, "headless agent-loop turn cap (0 = use config/env default)")
+	flag.StringVar(
+		&providerFlag,
+		"provider",
+		"",
+		"override the active provider (headless only, not persisted)",
+	)
+	flag.StringVar(
+		&modelFlag,
+		"model",
+		"",
+		"override the active model (headless only, not persisted)",
+	)
+	flag.IntVar(
+		&maxTurnsFlag,
+		"max-turns",
+		0,
+		"headless agent-loop turn cap (0 = use config/env default)",
+	)
+	flag.BoolVar(
+		&debugFlag,
+		"debug",
+		false,
+		"write verbose debug logs to ~/.zipcode/debug.log (headless only)",
+	)
+	flag.BoolVar(&debugFlag, "d", false, "alias for --debug")
+	flag.BoolVar(&yoloflag, "yolo", false, "auto-accept all file changes without prompting")
+	flag.BoolVar(&yoloflag, "y", false, "alias for --yolo")
 	flag.Parse()
 
 	if promptFlag != "" {
-		runHeadless(promptFlag, workspaceFlag, providerFlag, modelFlag, maxTurnsFlag)
+		runHeadless(
+			promptFlag,
+			workspaceFlag,
+			providerFlag,
+			modelFlag,
+			maxTurnsFlag,
+			debugFlag,
+			yoloflag,
+		)
 		return
 	}
 
@@ -50,10 +96,45 @@ func main() {
 	runtime := agent.NewRuntime(&ws)
 
 	app := tuix.NewApp(width, height)
-	app.Run(view.App, tuix.Props{Values: map[string]any{"runtime": &runtime, "wd": dir}})
+	app.Run(
+		view.App,
+		tuix.Props{Values: map[string]any{"runtime": &runtime, "wd": dir, "yoloRequested": yoloflag}},
+	)
 }
 
-func runHeadless(prompt, workspaceOverride, providerOverride, modelOverride string, maxTurnsOverride int) {
+func setupDebugLog() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "debug: cannot determine home dir: %v\n", err)
+		return
+	}
+	path := filepath.Join(home, ".zipcode", "debug.log")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Fprintf(
+			os.Stderr,
+			"debug: cannot open log file %s: %v\n",
+			path,
+			err,
+		)
+		return
+	}
+	log.SetOutput(f)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+	fmt.Fprintf(os.Stderr, "debug log: %s\n", path)
+}
+
+func runHeadless(
+	prompt, workspaceOverride, providerOverride, modelOverride string,
+	maxTurnsOverride int,
+	debug bool, yolo bool,
+) {
+
+	config.Cfg.YoloMode = yolo
+
+	if debug {
+		setupDebugLog()
+	}
 	config.Cfg.Headless = true
 
 	if maxTurnsOverride > 0 {
@@ -63,7 +144,11 @@ func runHeadless(prompt, workspaceOverride, providerOverride, modelOverride stri
 	if providerOverride != "" {
 		canonical, err := llm.GetProviderName(providerOverride)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "unsupported provider %q\n", providerOverride)
+			fmt.Fprintf(
+				os.Stderr,
+				"unsupported provider %q\n",
+				providerOverride,
+			)
 			os.Exit(1)
 		}
 		config.Cfg.ActiveProviderName = string(canonical)
@@ -88,7 +173,11 @@ func runHeadless(prompt, workspaceOverride, providerOverride, modelOverride stri
 	if dir == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to determine working directory: %v\n", err)
+			fmt.Fprintf(
+				os.Stderr,
+				"failed to determine working directory: %v\n",
+				err,
+			)
 			os.Exit(1)
 		}
 		dir = cwd
@@ -98,23 +187,30 @@ func runHeadless(prompt, workspaceOverride, providerOverride, modelOverride stri
 	runtime := agent.NewRuntime(&ws)
 
 	if runtime.CurrentProvider == nil {
-		fmt.Fprintln(os.Stderr, "no active provider configured: set ActiveProviderName in ~/.zipcode/config.toml or pass --provider")
+		fmt.Fprintln(
+			os.Stderr,
+			"no active provider configured: set ActiveProviderName in ~/.zipcode/config.toml or pass --provider",
+		)
 		os.Exit(1)
 	}
 	providerName := runtime.CurrentProvider.Name()
 	if _, ok := runtime.CredStore.Get(providerName); !ok {
-		fmt.Fprintf(os.Stderr, "no credentials for provider %q: configure ~/.zipcode/credentials.toml or set the provider's API key env var\n", providerName)
+		fmt.Fprintf(
+			os.Stderr,
+			"no credentials for provider %q: configure ~/.zipcode/credentials.toml or set the provider's API key env var\n",
+			providerName,
+		)
 		os.Exit(1)
 	}
 
 	go func() {
 		for {
-			agent.EventManager.ReadFromChannel(agent.NOTIFICATION_CHANNEL)
+			events.EventManager.ReadFromChannel(events.NOTIFICATION_CHANNEL)
 		}
 	}()
 	go func() {
 		for {
-			agent.EventManager.ReadFromChannel(agent.PLAN_STATUS_CHANNEL)
+			events.EventManager.ReadFromChannel(events.PLAN_STATUS_CHANNEL)
 		}
 	}()
 

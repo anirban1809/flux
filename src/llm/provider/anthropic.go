@@ -36,20 +36,20 @@ func (p *Anthropic) SetApiKey(key string) {
 }
 
 type anthropicTool struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description,omitempty"`
-	InputSchema tools.JSONSchema   `json:"input_schema"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	InputSchema tools.JSONSchema `json:"input_schema"`
 }
 
 type anthropicContentBlock struct {
-	Type       string          `json:"type"`
-	Text       string          `json:"text,omitempty"`
-	ID         string          `json:"id,omitempty"`
-	Name       string          `json:"name,omitempty"`
-	Input      json.RawMessage `json:"input,omitempty"`
-	ToolUseID  string          `json:"tool_use_id,omitempty"`
-	Content    string          `json:"content,omitempty"`
-	IsError    bool            `json:"is_error,omitempty"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text,omitempty"`
+	ID        string          `json:"id,omitempty"`
+	Name      string          `json:"name,omitempty"`
+	Input     json.RawMessage `json:"input,omitempty"`
+	ToolUseID string          `json:"tool_use_id,omitempty"`
+	Content   string          `json:"content,omitempty"`
+	IsError   bool            `json:"is_error,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -58,12 +58,12 @@ type anthropicMessage struct {
 }
 
 type anthropicRequest struct {
-	Model     string             `json:"model"`
-	MaxTokens int                `json:"max_tokens"`
-	System    string             `json:"system,omitempty"`
-	Messages  []anthropicMessage `json:"messages"`
-	Tools     []anthropicTool    `json:"tools,omitempty"`
-	Temperature float64          `json:"temperature,omitempty"`
+	Model       string             `json:"model"`
+	MaxTokens   int                `json:"max_tokens"`
+	System      string             `json:"system,omitempty"`
+	Messages    []anthropicMessage `json:"messages"`
+	Tools       []anthropicTool    `json:"tools,omitempty"`
+	Temperature float64            `json:"temperature,omitempty"`
 }
 
 type anthropicResponse struct {
@@ -148,6 +148,7 @@ func (p Anthropic) Complete(request ChatRequest) (ChatResponse, error) {
 		req.Header.Set("anthropic-version", anthropicAPIVersion)
 		return http.DefaultClient.Do(req)
 	})
+
 	if err != nil {
 		return ChatResponse{}, err
 	}
@@ -212,14 +213,13 @@ func (p Anthropic) Complete(request ChatRequest) (ChatResponse, error) {
 		Model:      parsed.Model,
 		StopReason: parsed.StopReason,
 		Usage: Usage{
-			// Normalize so InputTokens represents *total* input (matches OpenAI
-			// semantics) while CachedInputTokens is the cached-read portion.
-			// Anthropic's cache_creation is folded into the regular input
-			// bucket; we don't currently price it separately.
+			// InputTokens is the total input context (all buckets combined) so
+			// that context-window percentage stays accurate.
 			InputTokens: parsed.Usage.InputTokens +
 				parsed.Usage.CacheCreationInputTokens +
 				parsed.Usage.CacheReadInputTokens,
 			CachedInputTokens: parsed.Usage.CacheReadInputTokens,
+			CacheWriteTokens:  parsed.Usage.CacheCreationInputTokens,
 			OutputTokens:      parsed.Usage.OutputTokens,
 		},
 		Message: Message{
@@ -244,12 +244,14 @@ func (p Anthropic) Models() []ModelDescriptor {
 	descriptors := make([]ModelDescriptor, len(entries))
 	for i, e := range entries {
 		descriptors[i] = ModelDescriptor{
-			ID:                   e.id,
-			DisplayName:          e.id,
-			ProviderName:         string(AnthropicProvider),
-			ContextWindow:        e.contextWindow,
-			InputCostPerMillion:  e.inputCost,
-			OutputCostPerMillion: e.outputCost,
+			ID:                       e.id,
+			DisplayName:              e.id,
+			ProviderName:             string(AnthropicProvider),
+			ContextWindow:            e.contextWindow,
+			InputCostPerMillion:      e.inputCost,
+			OutputCostPerMillion:     e.outputCost,
+			CacheReadCostPerMillion:  e.inputCost * 0.10,
+			CacheWriteCostPerMillion: e.inputCost * 1.25,
 		}
 	}
 	return descriptors
@@ -271,7 +273,10 @@ func (p Anthropic) IsQuotaError(resp *http.Response, body []byte) bool {
 		return false
 	}
 	// Anthropic surfaces credit/quota issues via these markers.
-	if strings.Contains(strings.ToLower(parsed.Error.Message), "credit balance") {
+	if strings.Contains(
+		strings.ToLower(parsed.Error.Message),
+		"credit balance",
+	) {
 		return true
 	}
 	return parsed.Error.Type == "billing_error" ||

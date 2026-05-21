@@ -30,12 +30,16 @@ func StatusLine(props tuix.Props) tuix.Element {
 
 	inputTokens := 0
 	cachedInputTokens := 0
+	cacheWriteTokens := 0
 	outputTokens := 0
 	if v, ok := props.Get("inputTokens").(int); ok {
 		inputTokens = v
 	}
 	if v, ok := props.Get("cachedInputTokens").(int); ok {
 		cachedInputTokens = v
+	}
+	if v, ok := props.Get("cacheWriteTokens").(int); ok {
+		cacheWriteTokens = v
 	}
 	if v, ok := props.Get("outputTokens").(int); ok {
 		outputTokens = v
@@ -58,6 +62,7 @@ func StatusLine(props tuix.Props) tuix.Element {
 	var modelName string
 	contextWindow := 0
 	var inputCostPerM, outputCostPerM float64
+	var cacheReadCostPerM, cacheWriteCostPerM float64
 
 	if config.Cfg.ActiveProviderName == "" {
 		providerName = "Unconfigured"
@@ -74,15 +79,20 @@ func StatusLine(props tuix.Props) tuix.Element {
 				llm.ProviderName(config.Cfg.ActiveProviderName),
 				config.Cfg.CurrentModel,
 			)
+			cacheReadCostPerM, cacheWriteCostPerM = context.Runtime.Registry.CacheRatesFor(
+				llm.ProviderName(config.Cfg.ActiveProviderName),
+				config.Cfg.CurrentModel,
+			)
 		}
 	}
 
-	// Cache reads bill at ~10% of the input rate on both Anthropic and OpenAI;
-	// keep that as a single constant rather than tracking per-model rates.
-	const cachedInputDiscount = 0.10
-	uncachedInputTokens := inputTokens - cachedInputTokens
-	sessionCost := (float64(uncachedInputTokens)*inputCostPerM +
-		float64(cachedInputTokens)*inputCostPerM*cachedInputDiscount +
+	regularInputTokens := inputTokens - cachedInputTokens - cacheWriteTokens
+	if regularInputTokens < 0 {
+		regularInputTokens = 0
+	}
+	sessionCost := (float64(regularInputTokens)*inputCostPerM +
+		float64(cacheWriteTokens)*cacheWriteCostPerM +
+		float64(cachedInputTokens)*cacheReadCostPerM +
 		float64(outputTokens)*outputCostPerM) / 1_000_000
 	var costText string
 	if inputCostPerM > 0 || outputCostPerM > 0 {
@@ -119,16 +129,28 @@ func StatusLine(props tuix.Props) tuix.Element {
 		),
 	)
 
+	yoloText := ""
+	yoloStyle := tuix.NewStyle()
+	if config.Cfg.YoloMode {
+		yoloText = " | YOLO"
+		yoloStyle = yoloStyle.Foreground(tuix.Hex("#ff8c00")).Bold(true)
+	}
+
 	line2 := tuix.Box(
 		tuix.Props{Direction: tuix.Row, Justify: tuix.JustifySpaceBetween},
 		tuix.NewStyle(),
-		tuix.Text(
-			fmt.Sprintf(
-				"Model: %s (%s)",
-				modelName,
-				providerName,
-			),
+		tuix.Box(
+			tuix.Props{Direction: tuix.Row},
 			tuix.NewStyle(),
+			tuix.Text(
+				fmt.Sprintf(
+					"Model: %s (%s)",
+					modelName,
+					providerName,
+				),
+				tuix.NewStyle(),
+			),
+			tuix.Text(yoloText, yoloStyle),
 		),
 		tuix.Text(
 			contextPctText,

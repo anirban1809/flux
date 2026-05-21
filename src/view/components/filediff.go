@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"zipcode/src/agent"
+	"zipcode/src/events"
 	"zipcode/src/tools"
 
 	"github.com/anirban1809/tuix/tuix"
@@ -22,7 +22,7 @@ type renderedLine struct {
 }
 
 func FileDiff(props tuix.Props) tuix.Element {
-	fileDiff, ok := props.Get("fileDiff").(agent.FileChangeEvent)
+	fileDiff, ok := props.Get("fileDiff").(events.FileChangeEvent)
 	if !ok {
 		return tuix.Box(tuix.Props{}, tuix.NewStyle())
 	}
@@ -61,21 +61,18 @@ func FileDiff(props tuix.Props) tuix.Element {
 	}
 
 	if len(lines) > fileDiffWindowSize {
-		body = append(body, tuix.Text("", tuix.NewStyle()))
+		body = append(body, tuix.WrappedText("", tuix.NewStyle()))
 		body = append(body, scrollIndicator(viewFloor, ceil, len(lines)))
 	}
 
 	return tuix.Box(
 		tuix.Props{Direction: tuix.Column, Padding: [4]int{0, 1, 0, 1}},
-		tuix.NewStyle().Border(tuix.Border{
-			Top: true, Bottom: true, Left: true, Right: true,
-			Color: tuix.Hex("#3a3a3a"),
-		}),
+		tuix.NewStyle(),
 		body...,
 	)
 }
 
-func diffHeader(fd agent.FileChangeEvent) tuix.Element {
+func diffHeader(fd events.FileChangeEvent) tuix.Element {
 	op, opColor := opLabel(fd.ChangeType)
 
 	name := fd.FileName
@@ -94,26 +91,26 @@ func diffHeader(fd agent.FileChangeEvent) tuix.Element {
 	)
 }
 
-func opLabel(t agent.FileChangeType) (string, tuix.Color) {
+func opLabel(t events.FileChangeType) (string, tuix.Color) {
 	switch t {
-	case agent.FileChange_Create:
+	case events.FileChange_Create:
 		return "create", tuix.Hex("#67c27a")
-	case agent.FileChange_Append:
+	case events.FileChange_Append:
 		return "append", tuix.Hex("#64c3ff")
-	case agent.FileChange_Patch:
+	case events.FileChange_Patch:
 		return "patch", tuix.Hex("#e5c07b")
 	}
 	return "change", tuix.Hex("#cbcbcb")
 }
 
-func buildRenderedLines(fd agent.FileChangeEvent) []renderedLine {
+func buildRenderedLines(fd events.FileChangeEvent) []renderedLine {
 	addedStyle := tuix.NewStyle().Foreground(tuix.Hex("#67c27a"))
 	removedStyle := tuix.NewStyle().Foreground(tuix.Hex("#e06c75"))
 	contextStyle := tuix.NewStyle().Foreground(tuix.Hex("#a8a8a8"))
 	hunkStyle := tuix.NewStyle().Foreground(tuix.Hex("#56b6c2"))
 
 	switch fd.ChangeType {
-	case agent.FileChange_Create, agent.FileChange_Append:
+	case events.FileChange_Create, events.FileChange_Append:
 		if fd.Content == "" {
 			return nil
 		}
@@ -129,15 +126,21 @@ func buildRenderedLines(fd agent.FileChangeEvent) []renderedLine {
 		}
 		return out
 
-	case agent.FileChange_Patch:
+	case events.FileChange_Patch:
 		var out []renderedLine
 		for _, p := range fd.Patches {
 			for _, h := range p.Hunks {
 				out = append(out, renderedLine{
 					isHeader: true,
 					prefix:   "  ",
-					content:  fmt.Sprintf("@@ -%d,%d +%d,%d @@", h.OldStart, h.OldCount, h.NewStart, h.NewCount),
-					style:    hunkStyle,
+					content: fmt.Sprintf(
+						"@@ -%d,%d +%d,%d @@",
+						h.OldStart,
+						h.OldCount,
+						h.NewStart,
+						h.NewCount,
+					),
+					style: hunkStyle,
 				})
 				oldNum := h.OldStart
 				newNum := h.NewStart

@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "args": ["--check-go-version=false"]
+            "args": ["-p", "What is the current time?, use your bash tool", "-d"]
         }
     ]
 }

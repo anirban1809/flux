@@ -1,39 +1,18 @@
 package agent
 
-type PlanStepStatus int
-
-const (
-	PlanStepPending PlanStepStatus = iota
-	PlanStepRunning
-	PlanStepCompleted
-	PlanStepFailed
-)
-
-type PlanStep struct {
-	Outline string
-	Prompt  string
-	Output  string
-	Status  PlanStepStatus
-}
+import "zipcode/src/events"
 
 type Plan struct {
 	Title   string
-	Steps   []PlanStep
-	Current int
-	Active  bool
-}
-
-type PlanStatusEvent struct {
-	Title   string
-	Steps   []PlanStep
+	Steps   []events.PlanStep
 	Current int
 	Active  bool
 }
 
 func newPlan(title string, outlines []string) *Plan {
-	steps := make([]PlanStep, len(outlines))
+	steps := make([]events.PlanStep, len(outlines))
 	for i, o := range outlines {
-		steps[i] = PlanStep{Outline: o, Status: PlanStepPending}
+		steps[i] = events.PlanStep{Outline: o, Status: events.PlanStepPending}
 	}
 	return &Plan{
 		Title:  title,
@@ -42,10 +21,10 @@ func newPlan(title string, outlines []string) *Plan {
 	}
 }
 
-func (p *Plan) snapshot() PlanStatusEvent {
-	steps := make([]PlanStep, len(p.Steps))
+func (p *Plan) snapshot() events.PlanStatusEvent {
+	steps := make([]events.PlanStep, len(p.Steps))
 	copy(steps, p.Steps)
-	return PlanStatusEvent{
+	return events.PlanStatusEvent{
 		Title:   p.Title,
 		Steps:   steps,
 		Current: p.Current,

@@ -3,9 +3,9 @@ package view
 import (
 	"fmt"
 
-	"zipcode/src/agent"
 	"zipcode/src/config"
 	"zipcode/src/credentials"
+	"zipcode/src/events"
 	llm "zipcode/src/llm/provider"
 	view "zipcode/src/ui/components/utils"
 	"zipcode/src/utils"
@@ -73,10 +73,10 @@ func ProviderView(props tuix.Props) tuix.Element {
 			}
 		}
 
-		agent.EventManager.WriteToChannel(
-			agent.NOTIFICATION_CHANNEL,
-			agent.Notification{
-				Type: agent.INFO,
+		events.EventManager.WriteToChannel(
+			events.NOTIFICATION_CHANNEL,
+			events.Notification{
+				Type: events.INFO,
 				Message: fmt.Sprintf(
 					"Successfully configured api key for %s",
 					name,

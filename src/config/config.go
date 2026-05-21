@@ -13,6 +13,7 @@ import (
 
 type Config struct {
 	Headless              bool              `toml:"headless"`
+	YoloMode             bool              `toml:"-"` // session-only, never persisted
 	AppVersion            string            `toml:"app_version"`
 	ModelNames            []string          `toml:"model_names"`
 	CurrentModel          string            `toml:"current_model"`
@@ -31,6 +32,7 @@ type Config struct {
 	ConfigPath            string            `toml:"config_path"`
 	ActiveProviderName    string            `toml:"active_provider_name"`
 	ProviderModels        map[string]string `toml:"provider_models"`
+	StreamResponses       bool              `toml:"stream_responses"`
 }
 
 var Cfg = &Config{}
@@ -73,6 +75,7 @@ func defaults() *Config {
 		CredentialsPath:       "~/.zipcode/credentials.toml",
 		ConfigPath:            "~/.zipcode/config.toml",
 		ProviderModels:        map[string]string{},
+		StreamResponses:       true,
 	}
 }
 

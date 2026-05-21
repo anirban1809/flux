@@ -8,6 +8,7 @@ import (
 
 	"zipcode/src/config"
 	"zipcode/src/credentials"
+	"zipcode/src/events"
 	"zipcode/src/llm/prompts"
 	llm "zipcode/src/llm/provider"
 	"zipcode/src/skills"
@@ -35,7 +36,12 @@ func traceTurn(turn int, format string, args ...any) {
 	if !config.Cfg.Headless {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "[zipcode] turn %d: %s\n", turn, fmt.Sprintf(format, args...))
+	fmt.Fprintf(
+		os.Stderr,
+		"[zipcode] turn %d: %s\n",
+		turn,
+		fmt.Sprintf(format, args...),
+	)
 }
 
 const compactSummarizationPrompt = "Provide a concise but thorough summary of the conversation above. Preserve key context, decisions made, files touched, user preferences expressed, and the current state of any in-progress work. The summary will replace the full transcript so that the conversation can continue without losing context."
@@ -43,25 +49,26 @@ const compactSummarizationPrompt = "Provide a concise but thorough summary of th
 type RuntimeEvent string
 
 type Runtime struct {
-	Prompt          string
-	Executor        *Executor
-	Status          RuntimeStatus
-	Registry        llm.Registry
-	CurrentProvider llm.Provider
+	Prompt            string
+	Executor          *Executor
+	Status            RuntimeStatus
+	Registry          llm.Registry
+	CurrentProvider   llm.Provider
 	Workspace         *workspace.Workspace
 	Tools             []tools.Tool
 	InputTokens       int
 	CachedInputTokens int
+	CacheWriteTokens  int
 	OutputTokens      int
 	Conversation      llm.Conversation
-	Agent           Agent
-	Session         string
-	ChildRuntime    bool
-	SkillRegistry   *skills.SkillRegistry
-	SkillWatcher    *skills.Watcher
-	CredStore       *credentials.Store
-	Validator       credentials.Validator
-	activePlan      *Plan
+	Agent             Agent
+	Session           string
+	ChildRuntime      bool
+	SkillRegistry     *skills.SkillRegistry
+	SkillWatcher      *skills.Watcher
+	CredStore         *credentials.Store
+	Validator         credentials.Validator
+	activePlan        *Plan
 }
 
 func NewRuntime(workspace *workspace.Workspace) Runtime {
@@ -92,10 +99,10 @@ func NewRuntime(workspace *workspace.Workspace) Runtime {
 	err := runtime.CredStore.Load()
 
 	if err != nil {
-		go EventManager.WriteToChannel(
-			NOTIFICATION_CHANNEL,
-			Notification{
-				Type: ERROR,
+		go events.EventManager.WriteToChannel(
+			events.NOTIFICATION_CHANNEL,
+			events.Notification{
+				Type: events.ERROR,
 				Message: fmt.Sprintf(
 					"Failed to load credentials. Error: %s",
 					err.Error(),
@@ -120,7 +127,8 @@ func NewRuntime(workspace *workspace.Workspace) Runtime {
 			llm.ProviderName(config.Cfg.ActiveProviderName),
 		)
 		runtime.CurrentProvider = active
-		if saved, ok := config.Cfg.ProviderModels[config.Cfg.ActiveProviderName]; ok && saved != "" {
+		if saved, ok := config.Cfg.ProviderModels[config.Cfg.ActiveProviderName]; ok &&
+			saved != "" {
 			config.Cfg.CurrentModel = saved
 		} else if active != nil {
 			if models := active.Models(); len(models) > 0 {
@@ -159,7 +167,7 @@ func NewRuntime(workspace *workspace.Workspace) Runtime {
 	return runtime
 }
 
-func (r Runtime) GetExecutorEventChannel() chan ResponseEvent {
+func (r Runtime) GetExecutorEventChannel() chan events.ResponseEvent {
 	return r.Executor.EventChannel
 }
 
@@ -201,19 +209,19 @@ func (r *Runtime) maybeAutoCompact() {
 		return
 	}
 
-	go EventManager.WriteToChannel(
-		NOTIFICATION_CHANNEL,
-		Notification{
-			Type:    INFO,
+	go events.EventManager.WriteToChannel(
+		events.NOTIFICATION_CHANNEL,
+		events.Notification{
+			Type:    events.INFO,
 			Message: "Context exceeded auto-compact threshold; compacting conversation...",
 		},
 	)
 
 	if _, err := r.Compact(); err != nil {
-		go EventManager.WriteToChannel(
-			NOTIFICATION_CHANNEL,
-			Notification{
-				Type: ERROR,
+		go events.EventManager.WriteToChannel(
+			events.NOTIFICATION_CHANNEL,
+			events.Notification{
+				Type: events.ERROR,
 				Message: fmt.Sprintf(
 					"Auto-compact failed: %s",
 					err.Error(),
@@ -223,10 +231,10 @@ func (r *Runtime) maybeAutoCompact() {
 		return
 	}
 
-	go EventManager.WriteToChannel(
-		NOTIFICATION_CHANNEL,
-		Notification{
-			Type:    INFO,
+	go events.EventManager.WriteToChannel(
+		events.NOTIFICATION_CHANNEL,
+		events.Notification{
+			Type:    events.INFO,
 			Message: "Conversation compacted.",
 		},
 	)
@@ -242,6 +250,7 @@ func (r *Runtime) Clear() {
 	r.Agent.Conversation.Usage = llm.Usage{}
 	r.InputTokens = 0
 	r.CachedInputTokens = 0
+	r.CacheWriteTokens = 0
 	r.OutputTokens = 0
 	r.persistSessionHistory()
 }
@@ -302,6 +311,7 @@ func (r *Runtime) Compact() (string, error) {
 	r.Agent.Conversation.Usage = llm.Usage{}
 	r.InputTokens = 0
 	r.CachedInputTokens = 0
+	r.CacheWriteTokens = 0
 	r.OutputTokens = 0
 
 	r.persistSessionHistory()
@@ -424,7 +434,10 @@ func (r *Runtime) emitPlanStatus() {
 	if r.activePlan == nil {
 		return
 	}
-	EventManager.WriteToChannel(PLAN_STATUS_CHANNEL, r.activePlan.snapshot())
+	events.EventManager.WriteToChannel(
+		events.PLAN_STATUS_CHANNEL,
+		r.activePlan.snapshot(),
+	)
 }
 
 func (r *Runtime) generateStepPrompt(idx int) (string, error) {
@@ -438,9 +451,14 @@ func (r *Runtime) generateStepPrompt(idx int) (string, error) {
 	if config.Cfg.ActiveProviderName == "" {
 		return "", fmt.Errorf("no active provider configured")
 	}
-	provider := r.Registry.GetProvider(llm.ProviderName(config.Cfg.ActiveProviderName))
+	provider := r.Registry.GetProvider(
+		llm.ProviderName(config.Cfg.ActiveProviderName),
+	)
 	if provider == nil {
-		return "", fmt.Errorf("provider %q not registered", config.Cfg.ActiveProviderName)
+		return "", fmt.Errorf(
+			"provider %q not registered",
+			config.Cfg.ActiveProviderName,
+		)
 	}
 
 	var sb strings.Builder
@@ -462,7 +480,12 @@ func (r *Runtime) generateStepPrompt(idx int) (string, error) {
 		sb.WriteString(prev.Output)
 		sb.WriteString("\n")
 	}
-	fmt.Fprintf(&sb, "\nWrite the concrete prompt for step %d (%q).", idx+1, plan.Steps[idx].Outline)
+	fmt.Fprintf(
+		&sb,
+		"\nWrite the concrete prompt for step %d (%q).",
+		idx+1,
+		plan.Steps[idx].Outline,
+	)
 
 	resp, err := provider.Complete(llm.ChatRequest{
 		Model: config.Cfg.CurrentModel,
@@ -527,7 +550,7 @@ func (r *Runtime) handlePlanAction(
 		}, nil, nil
 	}
 	r.activePlan.Steps[0].Prompt = firstPrompt
-	r.activePlan.Steps[0].Status = PlanStepRunning
+	r.activePlan.Steps[0].Status = events.PlanStepRunning
 	r.emitPlanStatus()
 
 	ack := llm.Message{
@@ -675,7 +698,10 @@ func (r *Runtime) refreshSystemPrompt() {
 	if r.ChildRuntime {
 		return
 	}
-	prompt := prompts.BuildSystemPrompt(r.workspaceContext(), r.skillSummaries())
+	prompt := prompts.BuildSystemPrompt(
+		r.workspaceContext(),
+		r.skillSummaries(),
+	)
 	r.Agent.SystemPrompt = prompt
 	if len(r.Agent.Conversation.Messages) > 0 &&
 		r.Agent.Conversation.Messages[0].Role == "system" {
@@ -791,7 +817,7 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 				cur := r.activePlan.Current
 				if cur < len(r.activePlan.Steps) {
 					r.activePlan.Steps[cur].Output = lastResponse.Content
-					r.activePlan.Steps[cur].Status = PlanStepCompleted
+					r.activePlan.Steps[cur].Status = events.PlanStepCompleted
 					r.activePlan.Current++
 					r.emitPlanStatus()
 				}
@@ -805,13 +831,13 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 
 				nextPrompt, perr := r.generateStepPrompt(r.activePlan.Current)
 				if perr != nil {
-					r.activePlan.Steps[r.activePlan.Current].Status = PlanStepFailed
+					r.activePlan.Steps[r.activePlan.Current].Status = events.PlanStepFailed
 					r.activePlan.Active = false
 					r.emitPlanStatus()
-					go EventManager.WriteToChannel(
-						NOTIFICATION_CHANNEL,
-						Notification{
-							Type: ERROR,
+					go events.EventManager.WriteToChannel(
+						events.NOTIFICATION_CHANNEL,
+						events.Notification{
+							Type: events.ERROR,
 							Message: fmt.Sprintf(
 								"Plan step prompt generation failed: %s",
 								perr.Error(),
@@ -822,7 +848,7 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 					break
 				}
 				r.activePlan.Steps[r.activePlan.Current].Prompt = nextPrompt
-				r.activePlan.Steps[r.activePlan.Current].Status = PlanStepRunning
+				r.activePlan.Steps[r.activePlan.Current].Status = events.PlanStepRunning
 				r.emitPlanStatus()
 
 				conv, err = r.Agent.RunStep(llm.Message{
@@ -834,6 +860,7 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 				}
 				r.InputTokens += conv.Usage.InputTokens
 				r.CachedInputTokens += conv.Usage.CachedInputTokens
+				r.CacheWriteTokens += conv.Usage.CacheWriteTokens
 				r.OutputTokens += conv.Usage.OutputTokens
 				continue
 			}
@@ -907,7 +934,10 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 				}
 				messages = append(messages, ack)
 				if firstPrompt != nil {
-					pendingPlanPrompts = append(pendingPlanPrompts, *firstPrompt)
+					pendingPlanPrompts = append(
+						pendingPlanPrompts,
+						*firstPrompt,
+					)
 				}
 			}
 		}
@@ -936,7 +966,12 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 			}
 		}
 		if toolErrs > 0 {
-			traceTurn(turn, "tool errors this turn: %d/%d", toolErrs, len(messages))
+			traceTurn(
+				turn,
+				"tool errors this turn: %d/%d",
+				toolErrs,
+				len(messages),
+			)
 		}
 
 		conv, err = r.Agent.RunStep(messages...)
@@ -946,6 +981,7 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 
 		r.InputTokens += conv.Usage.InputTokens
 		r.CachedInputTokens += conv.Usage.CachedInputTokens
+		r.CacheWriteTokens += conv.Usage.CacheWriteTokens
 		r.OutputTokens += conv.Usage.OutputTokens
 	}
 

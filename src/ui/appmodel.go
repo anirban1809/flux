@@ -5,6 +5,7 @@ import (
 	"strings"
 	"zipcode/src/agent"
 	"zipcode/src/config"
+	"zipcode/src/events"
 	"zipcode/src/ui/components"
 	"zipcode/src/utils"
 	"zipcode/src/workspace"
@@ -77,13 +78,13 @@ func (a AppModel) Init() tea.Cmd {
 
 func waitForRuntimeEvent() tea.Cmd {
 	return func() tea.Msg {
-		return agent.EventManager.ReadFromChannel(agent.AGENT_OUTPUT_CHANNEL)
+		return events.EventManager.ReadFromChannel(events.AGENT_OUTPUT_CHANNEL)
 	}
 }
 
 func waitForFileChangeEvent() tea.Cmd {
 	return func() tea.Msg {
-		return agent.EventManager.ReadFromChannel(agent.FILE_DIFF_CHANNEL)
+		return events.EventManager.ReadFromChannel(events.FILE_DIFF_CHANNEL)
 	}
 }
 
@@ -94,7 +95,7 @@ func (a *AppModel) ProcessQuestion() {
 
 	a.Question.Visible = false
 	a.FileChangeViewer.Visible = false
-	agent.EventManager.WriteToChannel(agent.AGENT_INPUT_CHANNEL, a.Question.GetSelectedItem())
+	events.EventManager.WriteToChannel(events.AGENT_INPUT_CHANNEL, a.Question.GetSelectedItem())
 	a.Question.Selected = false
 }
 
@@ -204,10 +205,10 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		}
 
-	case agent.ResponseEvent:
+	case events.ResponseEvent:
 		a.StatusBar.UpdateUsage(a.Runtime.InputTokens, a.Runtime.OutputTokens)
 
-		if msg.EventType == agent.Tool {
+		if msg.EventType == events.Tool {
 			var message string
 
 			if msg.SubAgent && !a.subagent {
@@ -243,12 +244,12 @@ func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(waitForRuntimeEvent(), waitForFileChangeEvent())
 
-	case agent.FileChangeEvent:
+	case events.FileChangeEvent:
 		changeType := "patch"
 		switch msg.ChangeType {
-		case agent.FileChange_Create:
+		case events.FileChange_Create:
 			changeType = "create"
-		case agent.FileChange_Append:
+		case events.FileChange_Append:
 			changeType = "append"
 		}
 		a.FileChangeViewer = components.CreateFileChangeViewer(msg.FileName, changeType, msg.Content, msg.Patches)

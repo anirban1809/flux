@@ -11,6 +11,7 @@ import (
 	"zipcode/src/config"
 	"zipcode/src/llm/errors"
 	"zipcode/src/tools"
+	"zipcode/src/utils"
 
 	"github.com/joho/godotenv"
 )
@@ -182,39 +183,43 @@ func (p OpenRouterProvider) IsQuotaError(
 
 func (p OpenRouterProvider) Models() []ModelDescriptor {
 	entries := []struct {
-		id            string
-		contextWindow int
-		inputCost     float64
-		outputCost    float64
+		id             string
+		contextWindow  int
+		inputCost      float64
+		outputCost     float64
+		cacheReadRate  float64 // multiplier of inputCost (0 = no caching)
+		cacheWriteRate float64 // multiplier of inputCost (0 = no cache writes)
 	}{
-		{"openai/gpt-5.2", 400_000, 1.75, 14.00},
-		{"openai/gpt-5.5", 1_000_000, 5.00, 30.00},
-		{"minimax/minimax-m2.5", 196_608, 0.15, 1.15},
-		{"minimax/minimax-m2.7", 196_608, 0.279, 1.20},
-		{"anthropic/claude-sonnet-4.6", 1_000_000, 3.00, 15.00},
-		{"anthropic/claude-haiku-4.5", 200_000, 1.00, 5.00},
-		{"openai/gpt-5.1-codex-mini", 400_000, 0.25, 2.00},
-		{"moonshotai/kimi-k2.5", 262_144, 0.40, 1.90},
-		{"meta-llama/llama-3.3-70b-instruct", 128_000, 0.10, 0.32},
-		{"z-ai/glm-4.7", 200_000, 0.40, 1.75},
-		{"qwen/qwen3-coder-flash", 1_000_000, 0.195, 0.975},
-		{"openai/gpt-5-nano", 400_000, 0.05, 0.40},
-		{"z-ai/glm-5", 200_000, 0.60, 1.92},
-		{"openai/gpt-5.4-nano", 400_000, 0.20, 1.25},
-		{"deepseek/deepseek-v3.2", 200_000, 0.252, 0.378},
-		{"openai/gpt-5.4", 272_000, 2.50, 15.00},
-		{"openai/gpt-5.3-codex", 400_000, 1.75, 14.00},
-		{"z-ai/glm-5v-turbo", 202_752, 1.20, 4.00},
+		{"google/gemini-3.5-flash", 1048576, 1.40, 9, 0, 0},
+		{"openai/gpt-5.2", 400_000, 1.75, 14.00, 0.50, 0},
+		{"openai/gpt-5.5", 1_000_000, 5.00, 30.00, 0.50, 0},
+		{"minimax/minimax-m2.5", 196_608, 0.15, 1.15, 0, 0},
+		{"minimax/minimax-m2.7", 196_608, 0.279, 1.20, 0, 0},
+		{"openai/gpt-5.1-codex-mini", 400_000, 0.25, 2.00, 0.50, 0},
+		{"moonshotai/kimi-k2.5", 262_144, 0.40, 1.90, 0, 0},
+		{"meta-llama/llama-3.3-70b-instruct", 128_000, 0.10, 0.32, 0, 0},
+		{"z-ai/glm-4.7", 200_000, 0.40, 1.75, 0, 0},
+		{"qwen/qwen3-coder-flash", 1_000_000, 0.195, 0.975, 0, 0},
+		{"openai/gpt-5-nano", 400_000, 0.05, 0.40, 0.50, 0},
+		{"z-ai/glm-5", 200_000, 0.60, 1.92, 0, 0},
+		{"openai/gpt-5.4-nano", 400_000, 0.20, 1.25, 0.50, 0},
+		{"deepseek/deepseek-v3.2", 200_000, 0.252, 0.378, 0, 0},
+		{"openai/gpt-5.4", 272_000, 2.50, 15.00, 0.50, 0},
+		{"openai/gpt-5.3-codex", 400_000, 1.75, 14.00, 0.50, 0},
+		{"z-ai/glm-5v-turbo", 202_752, 1.20, 4.00, 0, 0},
+		{"moonshotai/kimi-k2.6", 262144, 0.73, 3.49, 0, 0},
 	}
 	descriptors := make([]ModelDescriptor, len(entries))
 	for i, e := range entries {
 		descriptors[i] = ModelDescriptor{
-			ID:                   e.id,
-			DisplayName:          e.id,
-			ProviderName:         string(OpenRouterAPIProvider),
-			ContextWindow:        e.contextWindow,
-			InputCostPerMillion:  e.inputCost,
-			OutputCostPerMillion: e.outputCost,
+			ID:                       e.id,
+			DisplayName:              e.id,
+			ProviderName:             string(OpenRouterAPIProvider),
+			ContextWindow:            e.contextWindow,
+			InputCostPerMillion:      e.inputCost,
+			OutputCostPerMillion:     e.outputCost,
+			CacheReadCostPerMillion:  e.inputCost * e.cacheReadRate,
+			CacheWriteCostPerMillion: e.inputCost * e.cacheWriteRate,
 		}
 	}
 	return descriptors
@@ -240,7 +245,7 @@ func (p *OpenRouterProvider) Complete(
 		requestBody := OpenRouterRequest{
 			Model:               config.Cfg.CurrentModel,
 			Messages:            request.Messages,
-			Stream:              false,
+			Stream:              true,
 			Tools:               request.Tools,
 			MaxTokens:           8192,
 			MaxCompletionTokens: 2048,
@@ -271,8 +276,16 @@ func (p *OpenRouterProvider) Complete(
 			return ChatResponse{}, err
 		}
 
+		defer res.Body.Close()
+
+		if config.Cfg.StreamResponses {
+			output := ParseStreamResponse(res.Body)
+			utils.LogValue(output)
+			return output, nil
+		}
+
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
+
 		if err != nil {
 			return ChatResponse{}, err
 		}
@@ -288,15 +301,18 @@ func (p *OpenRouterProvider) Complete(
 		}
 	}
 
-	var chatResponse ChatResponse
-	chatResponse.Model = finalResponse.Model
-	chatResponse.ID = finalResponse.ID
-	chatResponse.Usage.InputTokens = finalResponse.Usage.PromptTokens
-	chatResponse.Usage.CachedInputTokens = finalResponse.Usage.PromptTokensDetails.CachedTokens
-	chatResponse.Usage.OutputTokens = finalResponse.Usage.CompletionTokens
-	chatResponse.Message.Role = finalResponse.Choices[0].Message.Role
-	chatResponse.Message.Content = finalResponse.Choices[0].Message.Content
-	chatResponse.Message.ToolCalls = finalResponse.Choices[0].Message.ToolCalls
-
-	return chatResponse, nil
+	return ChatResponse{
+		ID:    finalResponse.ID,
+		Model: finalResponse.Model,
+		Usage: Usage{
+			InputTokens:       finalResponse.Usage.PromptTokens,
+			CachedInputTokens: finalResponse.Usage.PromptTokensDetails.CachedTokens,
+			OutputTokens:      finalResponse.Usage.CompletionTokens,
+		},
+		Message: Message{
+			Role:      finalResponse.Choices[0].Message.Role,
+			Content:   finalResponse.Choices[0].Message.Content,
+			ToolCalls: finalResponse.Choices[0].Message.ToolCalls,
+		},
+	}, nil
 }

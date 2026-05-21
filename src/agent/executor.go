@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"zipcode/src/config"
+	"zipcode/src/events"
 	llm "zipcode/src/llm/provider"
 	"zipcode/src/secrets"
 	"zipcode/src/tools"
@@ -15,41 +16,8 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 )
 
-type ResponseEventType int
-
-const (
-	Tool ResponseEventType = iota
-	Error
-	Message
-)
-
-type ResponseEvent struct {
-	Question     string
-	Options      []string
-	EventType    ResponseEventType
-	Message      string
-	SubAgent     bool
-	SubAgentName string
-	SkillName    string
-}
-
-type FileChangeType int
-
-const (
-	FileChange_Create FileChangeType = iota
-	FileChange_Append
-	FileChange_Patch
-)
-
-type FileChangeEvent struct {
-	FileName   string
-	ChangeType FileChangeType
-	Content    string
-	Patches    []tools.ParsedDiff
-}
-
 type Executor struct {
-	EventChannel    chan ResponseEvent
+	EventChannel    chan events.ResponseEvent
 	MessageChannel  chan string
 	SystemPrompt    string
 	Tools           []tools.Tool
@@ -72,7 +40,7 @@ func (e *Executor) IsPlanTool(name string) bool {
 
 func NewExecutor(systemPrompt string, tools []tools.Tool) *Executor {
 	return &Executor{
-		EventChannel:   make(chan ResponseEvent),
+		EventChannel:   make(chan events.ResponseEvent),
 		MessageChannel: make(chan string),
 		SystemPrompt:   systemPrompt,
 	}
@@ -155,7 +123,7 @@ func (e *Executor) ProcessResponse(
 
 	if response.ToolCalls == nil && strings.TrimSpace(response.Content) != "" {
 		if !e.SubAgentRunning {
-			e.pushEvent(Message, response.Content)
+			e.pushEvent(events.Message, response.Content)
 		}
 		return nil, ExecutionCompleted, nil
 	}
@@ -197,18 +165,21 @@ func (e *Executor) ProcessResponse(
 	return nil, ExecutionFailed, errors.New("invalid response type")
 }
 
-func (e *Executor) pushEvent(eventType ResponseEventType, value string) {
+func (e *Executor) pushEvent(eventType events.ResponseEventType, value string) {
 	if config.Cfg.Headless {
 		return
 	}
 
-	EventManager.WriteToChannel(AGENT_OUTPUT_CHANNEL, ResponseEvent{
-		EventType:    eventType,
-		Message:      secrets.RedactForDisplay(value),
-		SubAgent:     e.SubAgentRunning,
-		SubAgentName: e.SubAgent,
-		SkillName:    e.ActiveSkill,
-	})
+	events.EventManager.WriteToChannel(
+		events.AGENT_OUTPUT_CHANNEL,
+		events.ResponseEvent{
+			EventType:    eventType,
+			Message:      secrets.RedactForDisplay(value),
+			SubAgent:     e.SubAgentRunning,
+			SubAgentName: e.SubAgent,
+			SkillName:    e.ActiveSkill,
+		},
+	)
 }
 
 func GetTool(path string, toolname string) (tools.Tool, error) {
@@ -322,9 +293,9 @@ func (e *Executor) ProcessToolCall(
 
 		if msg, ok := args["message"].(string); ok {
 			e.pushEvent(
-				Tool,
+				events.Tool,
 				fmt.Sprintf(
-					"%s\n      └──>%s: %s",
+					"%s\n%s: %s",
 					msg,
 					input.Name,
 					strings.Join(params, ","),
@@ -369,38 +340,44 @@ func (e *Executor) ProcessToolCall(
 			patches = append(patches, parsedDiff)
 		}
 
-		var changeType FileChangeType
+		var changeType events.FileChangeType
 
 		switch fileWriteInput.Operation {
 		case "append":
-			changeType = FileChange_Append
+			changeType = events.FileChange_Append
 
 		case "create":
-			changeType = FileChange_Create
+			changeType = events.FileChange_Create
 
 		case "patch":
-			changeType = FileChange_Patch
+			changeType = events.FileChange_Patch
 
 		}
 
-		if !config.Cfg.Headless {
-			EventManager.WriteToChannel(FILE_DIFF_CHANNEL, FileChangeEvent{
-				FileName:   fileWriteInput.FilePath,
-				ChangeType: changeType,
-				Content:    fileWriteInput.Content,
-				Patches:    patches,
-			})
-
-			EventManager.WriteToChannel(AGENT_OUTPUT_CHANNEL, ResponseEvent{
-				Question:  "Do you want to make this change?",
-				Options:   []string{"Yes", "No"},
-				EventType: Tool,
-				Message:   fileWriteInput.Message,
-			})
-
-			msg = EventManager.ReadFromChannel(AGENT_INPUT_CHANNEL).(string)
-		} else {
+		if config.Cfg.Headless || config.Cfg.YoloMode {
 			msg = "Yes"
+		} else {
+			events.EventManager.WriteToChannel(
+				events.FILE_DIFF_CHANNEL,
+				events.FileChangeEvent{
+					FileName:   fileWriteInput.FilePath,
+					ChangeType: changeType,
+					Content:    fileWriteInput.Content,
+					Patches:    patches,
+				},
+			)
+
+			events.EventManager.WriteToChannel(
+				events.AGENT_OUTPUT_CHANNEL,
+				events.ResponseEvent{
+					Question:  "Do you want to make this change?",
+					Options:   []string{"Yes", "No"},
+					EventType: events.Tool,
+					Message:   fileWriteInput.Message,
+				},
+			)
+
+			msg = events.EventManager.ReadFromChannel(events.AGENT_INPUT_CHANNEL).(string)
 		}
 
 		if msg == "Yes" || msg == "Yes, and do not ask again for this session" {
@@ -453,14 +430,17 @@ func (e *Executor) ProcessToolCall(
 			}, nil
 		}
 
-		EventManager.WriteToChannel(AGENT_OUTPUT_CHANNEL, ResponseEvent{
-			Question:  questionInput.Question,
-			Options:   questionInput.Options,
-			EventType: Tool,
-			Message:   questionInput.Question,
-		})
+		events.EventManager.WriteToChannel(
+			events.AGENT_OUTPUT_CHANNEL,
+			events.ResponseEvent{
+				Question:  questionInput.Question,
+				Options:   questionInput.Options,
+				EventType: events.Tool,
+				Message:   questionInput.Question,
+			},
+		)
 
-		answer := EventManager.ReadFromChannel(AGENT_INPUT_CHANNEL).(string)
+		answer := events.EventManager.ReadFromChannel(events.AGENT_INPUT_CHANNEL).(string)
 
 		payload, err := json.Marshal(map[string]string{"selected": answer})
 		if err != nil {

@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"zipcode/src/agent"
+	"zipcode/src/events"
 	"zipcode/src/utils"
 	view "zipcode/src/view/components"
 	"zipcode/src/view/viewctx"
@@ -59,7 +59,7 @@ func MainMenu(props tuix.Props) tuix.Element {
 			Kind:   CmdPrompt,
 			Prompt: "Tell me about this project.",
 		},
-		{Name: "/exit", Kind: CmdAction, Run: func() { os.Exit(0) }},
+		{Name: "/exit", Kind: CmdAction, Run: func() { tuix.Exit() }},
 		{Name: "/clear", Kind: CmdAction, Run: func() {
 			if context.Runtime != nil {
 				context.Runtime.Clear()
@@ -68,10 +68,10 @@ func MainMenu(props tuix.Props) tuix.Element {
 				clearOutputs()
 			}
 			dismissMenu()
-			agent.EventManager.WriteToChannel(
-				agent.NOTIFICATION_CHANNEL,
-				agent.Notification{
-					Type:    agent.INFO,
+			events.EventManager.WriteToChannel(
+				events.NOTIFICATION_CHANNEL,
+				events.Notification{
+					Type:    events.INFO,
 					Message: "Conversation cleared.",
 				},
 			)
@@ -83,27 +83,27 @@ func MainMenu(props tuix.Props) tuix.Element {
 			runtime := context.Runtime
 			dismissMenu()
 			go func() {
-				agent.EventManager.WriteToChannel(
-					agent.NOTIFICATION_CHANNEL,
-					agent.Notification{
-						Type:    agent.INFO,
+				events.EventManager.WriteToChannel(
+					events.NOTIFICATION_CHANNEL,
+					events.Notification{
+						Type:    events.INFO,
 						Message: "Compacting conversation...",
 					},
 				)
 				if _, err := runtime.Compact(); err != nil {
-					agent.EventManager.WriteToChannel(
-						agent.NOTIFICATION_CHANNEL,
-						agent.Notification{
-							Type:    agent.ERROR,
+					events.EventManager.WriteToChannel(
+						events.NOTIFICATION_CHANNEL,
+						events.Notification{
+							Type:    events.ERROR,
 							Message: "Compact failed: " + err.Error(),
 						},
 					)
 					return
 				}
-				agent.EventManager.WriteToChannel(
-					agent.NOTIFICATION_CHANNEL,
-					agent.Notification{
-						Type:    agent.INFO,
+				events.EventManager.WriteToChannel(
+					events.NOTIFICATION_CHANNEL,
+					events.Notification{
+						Type:    events.INFO,
 						Message: "Conversation compacted.",
 					},
 				)

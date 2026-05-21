@@ -135,5 +135,10 @@ func generateSessionID() (string, error) {
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
-	return time.Now().UTC().Format("20060102-150405") + "-" + hex.EncodeToString(buf), nil
+	return time.Now().
+		UTC().
+		Format("20060102-150405") +
+		"-" + hex.EncodeToString(
+		buf,
+	), nil
 }

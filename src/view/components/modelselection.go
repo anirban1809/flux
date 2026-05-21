@@ -3,8 +3,8 @@ package view
 import (
 	"fmt"
 
-	"zipcode/src/agent"
 	"zipcode/src/config"
+	"zipcode/src/events"
 	llm "zipcode/src/llm/provider"
 	"zipcode/src/view/viewctx"
 
@@ -45,10 +45,10 @@ func ModelSelection(props tuix.Props) tuix.Element {
 			}
 			config.Cfg.ProviderModels[config.Cfg.ActiveProviderName] = selected
 			config.Cfg.Save()
-			agent.EventManager.WriteToChannel(
-				agent.NOTIFICATION_CHANNEL,
-				agent.Notification{
-					Type: agent.INFO,
+			events.EventManager.WriteToChannel(
+				events.NOTIFICATION_CHANNEL,
+				events.Notification{
+					Type: events.INFO,
 					Message: fmt.Sprintf(
 						"Current model changed to: %s",
 						selected,

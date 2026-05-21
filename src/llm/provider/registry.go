@@ -52,3 +52,19 @@ func (r Registry) CostFor(providerName ProviderName, modelID string) (inputPerMi
 	}
 	return 0, 0
 }
+
+// CacheRatesFor returns the cache-read and cache-write cost per 1M tokens
+// (USD) for the given provider+model. Returns zeros if the model is not
+// registered or does not support prompt caching.
+func (r Registry) CacheRatesFor(providerName ProviderName, modelID string) (readPerMillion, writePerMillion float64) {
+	provider := r.GetProvider(providerName)
+	if provider == nil {
+		return 0, 0
+	}
+	for _, m := range provider.Models() {
+		if m.ID == modelID {
+			return m.CacheReadCostPerMillion, m.CacheWriteCostPerMillion
+		}
+	}
+	return 0, 0
+}

@@ -16,7 +16,11 @@ const (
 )
 
 func GetSupportedProviders() []ProviderName {
-	return []ProviderName{OpenAIProvider, OpenRouterAPIProvider, AnthropicProvider}
+	return []ProviderName{
+		OpenAIProvider,
+		OpenRouterAPIProvider,
+		AnthropicProvider,
+	}
 }
 
 func GetProviderEnvVar(provider ProviderName) (string, error) {
@@ -49,14 +53,16 @@ func GetProviderName(provider string) (ProviderName, error) {
 }
 
 type ModelDescriptor struct {
-	ID                    string
-	DisplayName           string
-	ProviderName          string
-	ContextWindow         int
-	Effort                string
+	ID            string
+	DisplayName   string
+	ProviderName  string
+	ContextWindow int
+	Effort        string
 	// USD per 1M tokens.
-	InputCostPerMillion  float64
-	OutputCostPerMillion float64
+	InputCostPerMillion      float64
+	OutputCostPerMillion     float64
+	CacheReadCostPerMillion  float64 // 0 if provider doesn't support prompt caching
+	CacheWriteCostPerMillion float64 // 0 if provider doesn't charge separately for cache writes
 }
 
 type BlockType string
@@ -126,6 +132,7 @@ type ChatRequest struct {
 type Usage struct {
 	InputTokens       int `json:"input_tokens"`
 	CachedInputTokens int `json:"cached_input_tokens"`
+	CacheWriteTokens  int `json:"cache_write_tokens"`
 	OutputTokens      int `json:"output_tokens"`
 }
 

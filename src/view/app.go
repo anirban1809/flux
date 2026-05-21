@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"zipcode/src/agent"
+	"zipcode/src/config"
+	"zipcode/src/events"
 	view "zipcode/src/view/components"
 	"zipcode/src/view/viewctx"
 	"zipcode/src/workspace"
@@ -24,7 +26,7 @@ func App(props tuix.Props) tuix.Element {
 	livePrompt, setLivePrompt := tuix.UseState("")
 	livePromptIdx, setLivePromptIdx := tuix.UseState(-1)
 	activeMenuView, setActiveMenuView := tuix.UseState("")
-	notification, setNotification := tuix.UseState(agent.Notification{})
+	notification, setNotification := tuix.UseState(events.Notification{})
 	activeSkillName, setActiveSkillName := tuix.UseState("")
 
 	questionVisible, setQuestionVisible := tuix.UseState(false)
@@ -34,10 +36,15 @@ func App(props tuix.Props) tuix.Element {
 	}{})
 	selectedOption, setSelectedOption := tuix.UseState("")
 	optionSelected, setOptionSelected := tuix.UseState(false)
-	fileDiff, setFileDiff := tuix.UseState(agent.FileChangeEvent{})
+	fileDiff, setFileDiff := tuix.UseState(events.FileChangeEvent{})
 	focusPrompt, setFocusPrompt := tuix.UseState(true)
-	planStatus, setPlanStatus := tuix.UseState(agent.PlanStatusEvent{})
+	planStatus, setPlanStatus := tuix.UseState(events.PlanStatusEvent{})
 	queuedCount, setQueuedCount := tuix.UseState(0)
+
+	yoloRequested, _ := props.Get("yoloRequested").(bool)
+	yoloConfirmPending, setYoloConfirmPending := tuix.UseState(yoloRequested)
+	yoloConfirmSelected, setYoloConfirmSelected := tuix.UseState("")
+	yoloConfirmOptionSelected, setYoloConfirmOptionSelected := tuix.UseState(false)
 
 	runtime := props.Get("runtime").(*agent.Runtime)
 
@@ -60,10 +67,10 @@ func App(props tuix.Props) tuix.Element {
 
 		go func() {
 			if _, err := runtime.Run(send); err != nil {
-				agent.EventManager.WriteToChannel(
-					agent.NOTIFICATION_CHANNEL,
-					agent.Notification{
-						Type:    agent.ERROR,
+				events.EventManager.WriteToChannel(
+					events.NOTIFICATION_CHANNEL,
+					events.Notification{
+						Type:    events.ERROR,
 						Message: err.Error(),
 					},
 				)
@@ -77,14 +84,26 @@ func App(props tuix.Props) tuix.Element {
 			setQueuedCount(queuedCount + 1)
 			setPrompt("")
 		default:
-			agent.EventManager.WriteToChannel(
-				agent.NOTIFICATION_CHANNEL,
-				agent.Notification{
-					Type:    agent.ERROR,
+			events.EventManager.WriteToChannel(
+				events.NOTIFICATION_CHANNEL,
+				events.Notification{
+					Type:    events.ERROR,
 					Message: "Prompt queue is full; wait for the active plan to finish.",
 				},
 			)
 		}
+	}
+
+	if yoloConfirmOptionSelected {
+		if yoloConfirmSelected == "Yes, enable YOLO mode" {
+			config.Cfg.YoloMode = true
+		}
+		setYoloConfirmOptionSelected(false)
+		setYoloConfirmPending(false)
+	}
+
+	if !yoloConfirmPending && tuix.CurrentKey.Rune == '\x19' { // ctrl+y toggles YOLO mode
+		config.Cfg.YoloMode = !config.Cfg.YoloMode
 	}
 
 	canSubmit := tuix.CurrentKey.Code == tuix.KeyEnter && !menuVisible
@@ -100,42 +119,49 @@ func App(props tuix.Props) tuix.Element {
 		go func() {
 			var activeSubAgent string
 			var activeSkill string
-			agentOut := make(chan agent.ResponseEvent)
+			agentOut := make(chan events.ResponseEvent)
 
 			go func() {
 				for {
 					setFileDiff(
-						agent.EventManager.ReadFromChannel(
-							agent.FILE_DIFF_CHANNEL,
-						).(agent.FileChangeEvent),
+						events.EventManager.ReadFromChannel(
+							events.FILE_DIFF_CHANNEL,
+						).(events.FileChangeEvent),
 					)
 				}
 			}()
 
 			go func() {
 				for {
-					ev := agent.EventManager.ReadFromChannel(agent.AGENT_OUTPUT_CHANNEL).(agent.ResponseEvent)
+					ev := events.EventManager.ReadFromChannel(events.AGENT_OUTPUT_CHANNEL).(events.ResponseEvent)
 					agentOut <- ev
 				}
 			}()
 
 			go func() {
 				for {
-					notif := agent.EventManager.ReadFromChannel(agent.NOTIFICATION_CHANNEL).(agent.Notification)
+					ev := events.EventManager.ReadFromChannel(events.STREAM_CHUNK_CHANNEL).(string)
+					agentOut <- events.ResponseEvent{Message: ev, EventType: events.StreamChunk}
+				}
+			}()
+
+			go func() {
+				for {
+					notif := events.EventManager.ReadFromChannel(events.NOTIFICATION_CHANNEL).(events.Notification)
 
 					if notif.Message == "ERR_MISSING_PROVIDER" {
 						setNotification(
-							agent.Notification{
-								Type:    agent.ERROR,
+							events.Notification{
+								Type:    events.ERROR,
 								Message: "No providers configured, please configure a provider via /providers command in the main menu",
 							},
 						)
 						continue
 					}
 
-					if notif.Type == agent.ERROR {
-						agentOut <- agent.ResponseEvent{
-							EventType: agent.Error,
+					if notif.Type == events.ERROR {
+						agentOut <- events.ResponseEvent{
+							EventType: events.Error,
 						}
 					}
 					setNotification(notif)
@@ -144,7 +170,7 @@ func App(props tuix.Props) tuix.Element {
 
 			go func() {
 				for {
-					ev := agent.EventManager.ReadFromChannel(agent.PLAN_STATUS_CHANNEL).(agent.PlanStatusEvent)
+					ev := events.EventManager.ReadFromChannel(events.PLAN_STATUS_CHANNEL).(events.PlanStatusEvent)
 					setPlanStatus(ev)
 				}
 			}()
@@ -152,6 +178,8 @@ func App(props tuix.Props) tuix.Element {
 			var acc []tuix.Element
 			var liveLocal string
 			promptIdx := -1
+			streamBufIdx := -1
+			streamBuf := ""
 			for {
 				select {
 
@@ -159,6 +187,8 @@ func App(props tuix.Props) tuix.Element {
 					acc = acc[:0]
 					liveLocal = ""
 					promptIdx = -1
+					streamBufIdx = -1
+					streamBuf = ""
 					setLivePrompt("")
 					setLivePromptIdx(-1)
 					setOutputs(nil)
@@ -173,8 +203,24 @@ func App(props tuix.Props) tuix.Element {
 					msg := ev.Message
 					style := tuix.NewStyle().Foreground(tuix.Hex("#c8c8c8"))
 
-					if ev.EventType == agent.Tool {
+					switch ev.EventType {
+					case events.StreamChunk:
+						streamBuf += msg
+						el := tuix.Box(
+							tuix.Props{Padding: [4]int{0, 2, 0, 2}},
+							tuix.NewStyle(),
+							tuix.Markdown(streamBuf, style),
+						)
+						if streamBufIdx < 0 {
+							streamBufIdx = len(acc)
+							acc = append(acc, el)
+						} else {
+							acc[streamBufIdx] = el
+						}
 
+					case events.Tool:
+						streamBufIdx = -1
+						streamBuf = ""
 						if ev.Question != "" {
 							setQuestionVisible(true)
 							setQuestion(struct {
@@ -212,18 +258,33 @@ func App(props tuix.Props) tuix.Element {
 								setActiveSkillName("")
 							}
 							activeSkill = ""
-							msg = fmt.Sprintf("  └──%s", msg)
+							msg = fmt.Sprintf("⏺ %s\n", msg)
 							style = style.Foreground(tuix.Hex("#848484"))
 						}
-					} else {
+						acc = append(
+							acc,
+							tuix.Box(
+								tuix.Props{Padding: [4]int{0, 2, 0, 2}},
+								tuix.NewStyle(),
+								tuix.WrappedText(msg, style),
+							),
+						)
+
+					default: // Message or Error
+						wasStreaming := streamBufIdx >= 0
+						streamBufIdx = -1
+						streamBuf = ""
+
 						if liveLocal != "" && promptIdx >= 0 {
 							var promptEl tuix.Element
-							if ev.EventType == agent.Error {
-								promptEl = view.Prompt(tuix.Props{Values: map[string]any{
-									"prompt":  liveLocal,
-									"running": false,
-									"failed":  true,
-								}})
+							if ev.EventType == events.Error {
+								promptEl = view.Prompt(
+									tuix.Props{Values: map[string]any{
+										"prompt":  liveLocal,
+										"running": false,
+										"failed":  true,
+									}},
+								)
 							} else {
 								promptEl = view.Prompt(tuix.Props{Values: map[string]any{
 									"prompt":  liveLocal,
@@ -231,8 +292,11 @@ func App(props tuix.Props) tuix.Element {
 									"failed":  false,
 								}})
 							}
-							acc = append(acc[:promptIdx], append([]tuix.Element{promptEl}, acc[promptIdx:]...)...)
-							// appending an empty line to reduce cluttering
+							acc = append(
+								acc[:promptIdx],
+								append(
+									[]tuix.Element{promptEl},
+									acc[promptIdx:]...)...)
 							acc = append(acc, tuix.Text("", tuix.NewStyle()))
 							liveLocal = ""
 							promptIdx = -1
@@ -247,20 +311,17 @@ func App(props tuix.Props) tuix.Element {
 							go submitPrompt(queued)
 						default:
 						}
-					}
 
-					if ev.EventType != agent.Error {
-						acc = append(
-							acc,
-							tuix.Box(
-								tuix.Props{Padding: [4]int{0, 2, 0, 2}},
-								tuix.NewStyle(),
-								tuix.WrappedText(
-									msg,
-									style,
+						if ev.EventType != events.Error && !wasStreaming {
+							acc = append(
+								acc,
+								tuix.Box(
+									tuix.Props{Padding: [4]int{0, 2, 0, 2}},
+									tuix.NewStyle(),
+									tuix.Markdown(msg+"\n", style),
 								),
-							),
-						)
+							)
+						}
 					}
 				}
 
@@ -271,6 +332,22 @@ func App(props tuix.Props) tuix.Element {
 		}()
 		return func() {}
 	}, []any{})
+
+	if yoloConfirmPending {
+		return viewctx.MainContext.Provide(
+			&viewctx.ContextType{
+				Runtime:        runtime,
+				SetFocusPrompt: setFocusPrompt,
+			}, func() tuix.Element {
+				return view.YoloConfirm(tuix.Props{Values: map[string]any{
+					"onChange": func(selected string, _ int) {
+						setYoloConfirmSelected(selected)
+						setYoloConfirmOptionSelected(true)
+					},
+				}})
+			},
+		)
+	}
 
 	return viewctx.MainContext.Provide(
 		&viewctx.ContextType{
@@ -323,8 +400,8 @@ func App(props tuix.Props) tuix.Element {
 			}
 
 			if optionSelected {
-				go agent.EventManager.WriteToChannel(
-					agent.AGENT_INPUT_CHANNEL,
+				go events.EventManager.WriteToChannel(
+					events.AGENT_INPUT_CHANNEL,
 					selectedOption,
 				)
 				setOptionSelected(false)
@@ -333,7 +410,7 @@ func App(props tuix.Props) tuix.Element {
 
 			notificationStyle := tuix.NewStyle().Foreground(tuix.Hex("#a3edff"))
 
-			if notification.Type == agent.ERROR {
+			if notification.Type == events.ERROR {
 				notificationStyle = tuix.NewStyle().
 					Foreground(tuix.Hex("#ff8282"))
 			}
@@ -375,7 +452,7 @@ func App(props tuix.Props) tuix.Element {
 					prompt,
 					func(value string) {
 						setNotification(
-							agent.Notification{Type: agent.INFO, Message: ""},
+							events.Notification{Type: events.INFO, Message: ""},
 						)
 						setPrompt(value)
 					},
@@ -420,6 +497,7 @@ func App(props tuix.Props) tuix.Element {
 					"running":               activeSession,
 					"inputTokens":           runtime.InputTokens,
 					"cachedInputTokens":     runtime.CachedInputTokens,
+					"cacheWriteTokens":      runtime.CacheWriteTokens,
 					"outputTokens":          runtime.OutputTokens,
 					"branch":                runtime.Workspace.GetCurrentBranch(),
 					"hasUncommittedChanges": runtime.Workspace.HasUncommittedChanges(),

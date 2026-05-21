@@ -81,7 +81,8 @@ func (s *Store) Load() error {
 			continue
 		}
 		entry := ProviderKey{APIKey: envKey}
-		if existing, ok := s.Providers[provider]; ok && existing.APIKey == envKey {
+		if existing, ok := s.Providers[provider]; ok &&
+			existing.APIKey == envKey {
 			entry.Status = existing.Status
 			entry.LastValidated = existing.LastValidated
 		}
