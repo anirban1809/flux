@@ -2,8 +2,6 @@ module zipcode
 
 go 1.26.1
 
-replace github.com/anirban1809/tuix => /Users/anirban/Documents/Code/tuix
-
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/anirban1809/tuix v0.0.21
