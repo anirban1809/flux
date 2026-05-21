@@ -2,9 +2,9 @@ package account
 
 import (
 	"bytes"
+	"flux/src/config"
+	"flux/src/credentials"
 	"time"
-	"zipcode/src/config"
-	"zipcode/src/credentials"
 
 	"github.com/BurntSushi/toml"
 )

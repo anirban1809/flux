@@ -1,7 +1,7 @@
 package view
 
 import (
-	"zipcode/src/utils"
+	"flux/src/utils"
 
 	"github.com/anirban1809/tuix/tuix"
 )

@@ -3,10 +3,10 @@ package view
 import (
 	"fmt"
 
-	"zipcode/src/agent"
-	"zipcode/src/skills"
-	view "zipcode/src/ui/components/utils"
-	"zipcode/src/view/viewctx"
+	"flux/src/agent"
+	"flux/src/skills"
+	view "flux/src/ui/components/utils"
+	"flux/src/view/viewctx"
 
 	"github.com/anirban1809/tuix/tuix"
 )
@@ -43,7 +43,7 @@ func Skills(props tuix.Props) tuix.Element {
 			tuix.Text("No skills found.", tuix.NewStyle()),
 			view.NewLine(),
 			tuix.Text(
-				"Create skills in .zipcode/skills/ or ~/.zipcode/skills/ as Markdown files.",
+				"Create skills in .flux/skills/ or ~/.flux/skills/ as Markdown files.",
 				tuix.NewStyle(),
 			),
 			tuix.Text("Press Esc to go back.", tuix.NewStyle()),

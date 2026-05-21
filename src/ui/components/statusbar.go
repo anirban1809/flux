@@ -1,10 +1,10 @@
 package components
 
 import (
+	"flux/src/config"
+	"flux/src/utils"
+	"flux/src/workspace"
 	"fmt"
-	"zipcode/src/config"
-	"zipcode/src/utils"
-	"zipcode/src/workspace"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -104,7 +104,7 @@ func (s StatusBar) convertTokenValues() (string, string) {
 }
 
 func renderStatusBar(width int, s StatusBar) string {
-	appVersion := fmt.Sprintf("ZipCode v%s ", config.Cfg.AppVersion)
+	appVersion := fmt.Sprintf("flux v%s ", config.Cfg.AppVersion)
 
 	spinnerView := ""
 
@@ -125,7 +125,10 @@ func renderStatusBar(width int, s StatusBar) string {
 		outputTokens,
 	)
 
-	content := status + utils.FlexGap(width, len(status)+len(appVersion)) + appVersion
+	content := status + utils.FlexGap(
+		width,
+		len(status)+len(appVersion),
+	) + appVersion
 
 	return lipgloss.NewStyle().
 		Width(width).

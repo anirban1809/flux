@@ -13,7 +13,7 @@ import (
 
 type Config struct {
 	Headless              bool              `toml:"headless"`
-	YoloMode             bool              `toml:"-"` // session-only, never persisted
+	YoloMode              bool              `toml:"-"` // session-only, never persisted
 	AppVersion            string            `toml:"app_version"`
 	ModelNames            []string          `toml:"model_names"`
 	CurrentModel          string            `toml:"current_model"`
@@ -63,28 +63,28 @@ func defaults() *Config {
 		},
 		CurrentModel:          "minimax/minimax-m2.5",
 		MaxHeadlessTurns:      100,
-		InternalToolPath:      "/Users/anirban/Documents/Code/zipcode/src/tools",
-		ExternalToolPath:      "~/.zipcode/tools",
-		InternalSubagentsPath: "/Users/anirban/Documents/Code/zipcode/src/subagents",
-		ExternalSubagentsPath: "~/.zipcode/tools",
-		InternalSkillsPath:    "/Users/anirban/Documents/Code/zipcode/src/skills/builtin",
-		GlobalSkillsPath:      "~/.zipcode/skills",
-		ProjectSkillsPath:     ".zipcode/skills",
-		SkillsStatePath:       "~/.zipcode/skills.state.json",
-		HomeDir:               "~/.zipcode",
-		CredentialsPath:       "~/.zipcode/credentials.toml",
-		ConfigPath:            "~/.zipcode/config.toml",
+		InternalToolPath:      "/Users/anirban/Documents/Code/flux/src/tools",
+		ExternalToolPath:      "~/.flux/tools",
+		InternalSubagentsPath: "/Users/anirban/Documents/Code/flux/src/subagents",
+		ExternalSubagentsPath: "~/.flux/tools",
+		InternalSkillsPath:    "/Users/anirban/Documents/Code/flux/src/skills/builtin",
+		GlobalSkillsPath:      "~/.flux/skills",
+		ProjectSkillsPath:     ".flux/skills",
+		SkillsStatePath:       "~/.flux/skills.state.json",
+		HomeDir:               "~/.flux",
+		CredentialsPath:       "~/.flux/credentials.toml",
+		ConfigPath:            "~/.flux/config.toml",
 		ProviderModels:        map[string]string{},
 		StreamResponses:       true,
 	}
 }
 
-func zipcodeDir() (string, error) {
+func fluxDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".zipcode"), nil
+	return filepath.Join(home, ".flux"), nil
 }
 
 func Load() error {
@@ -92,7 +92,7 @@ func Load() error {
 	if err != nil {
 		return err
 	}
-	dir := filepath.Join(home, ".zipcode")
+	dir := filepath.Join(home, ".flux")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -125,13 +125,13 @@ func Load() error {
 	// Env vars override config.toml/defaults so the binary can be pointed
 	// at a container- or sandbox-appropriate tool directory without
 	// shipping a config file.
-	if v := os.Getenv("ZIPCODE_INTERNAL_TOOL_PATH"); v != "" {
+	if v := os.Getenv("FLUX_INTERNAL_TOOL_PATH"); v != "" {
 		Cfg.InternalToolPath = v
 	}
-	if v := os.Getenv("ZIPCODE_EXTERNAL_TOOL_PATH"); v != "" {
+	if v := os.Getenv("FLUX_EXTERNAL_TOOL_PATH"); v != "" {
 		Cfg.ExternalToolPath = v
 	}
-	if v := os.Getenv("ZIPCODE_MAX_HEADLESS_TURNS"); v != "" {
+	if v := os.Getenv("FLUX_MAX_HEADLESS_TURNS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			Cfg.MaxHeadlessTurns = n
 		}
@@ -142,7 +142,7 @@ func Load() error {
 }
 
 func (c *Config) Save() error {
-	dir, err := zipcodeDir()
+	dir, err := fluxDir()
 	if err != nil {
 		return err
 	}

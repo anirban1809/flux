@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"zipcode/src/agent"
-	"zipcode/src/config"
-	llm "zipcode/src/llm/provider"
+	"flux/src/agent"
+	"flux/src/config"
+	llm "flux/src/llm/provider"
 
 	"github.com/anirban1809/tuix/tuix"
 )
@@ -93,10 +93,16 @@ func Context(props tuix.Props) tuix.Element {
 		fmt.Sprintf("  System prompt   ~%s", formatTokens(sysTokens)),
 	)
 	if wsTokens > 0 {
-		lines = append(lines, fmt.Sprintf("    Workspace     ~%s", formatTokens(wsTokens)))
+		lines = append(
+			lines,
+			fmt.Sprintf("    Workspace     ~%s", formatTokens(wsTokens)),
+		)
 	}
 	if skillsTokens > 0 {
-		lines = append(lines, fmt.Sprintf("    Skills        ~%s", formatTokens(skillsTokens)))
+		lines = append(
+			lines,
+			fmt.Sprintf("    Skills        ~%s", formatTokens(skillsTokens)),
+		)
 	}
 	lines = append(lines,
 		fmt.Sprintf("  Tool schemas    ~%s", formatTokens(toolTokens)),
@@ -137,7 +143,9 @@ func sessionMessages(runtime *agent.Runtime) []llm.Message {
 // walkUsage returns the input tokens of the most recent assistant call (i.e.
 // the current context size), the output tokens of that same call, and the
 // sum of output tokens across the whole session.
-func walkUsage(messages []llm.Message) (latestInput, latestOutput, sessionOutput int) {
+func walkUsage(
+	messages []llm.Message,
+) (latestInput, latestOutput, sessionOutput int) {
 	seenLatest := false
 	for i := len(messages) - 1; i >= 0; i-- {
 		u := messages[i].Usage

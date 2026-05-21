@@ -3,10 +3,10 @@ package credentials
 import (
 	"bytes"
 	"errors"
+	"flux/src/config"
+	llm "flux/src/llm/provider"
 	"os"
 	"time"
-	"zipcode/src/config"
-	llm "zipcode/src/llm/provider"
 
 	"github.com/BurntSushi/toml"
 )

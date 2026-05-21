@@ -1,11 +1,11 @@
 package view
 
 import (
+	"flux/src/events"
+	"flux/src/tools"
 	"fmt"
 	"strconv"
 	"strings"
-	"zipcode/src/events"
-	"zipcode/src/tools"
 
 	"github.com/anirban1809/tuix/tuix"
 )

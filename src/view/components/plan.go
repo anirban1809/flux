@@ -1,8 +1,8 @@
 package view
 
 import (
+	"flux/src/events"
 	"fmt"
-	"zipcode/src/events"
 
 	"github.com/anirban1809/tuix/tuix"
 )

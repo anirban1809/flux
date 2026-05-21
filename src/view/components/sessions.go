@@ -3,8 +3,8 @@ package view
 import (
 	"fmt"
 
-	"zipcode/src/agent"
-	"zipcode/src/workspace"
+	"flux/src/agent"
+	"flux/src/workspace"
 
 	"github.com/anirban1809/tuix/tuix"
 )

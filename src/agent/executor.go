@@ -3,15 +3,15 @@ package agent
 import (
 	"encoding/json"
 	"errors"
+	"flux/src/config"
+	"flux/src/events"
+	llm "flux/src/llm/provider"
+	"flux/src/secrets"
+	"flux/src/tools"
+	"flux/src/utils"
 	"fmt"
 	"os"
 	"strings"
-	"zipcode/src/config"
-	"zipcode/src/events"
-	llm "zipcode/src/llm/provider"
-	"zipcode/src/secrets"
-	"zipcode/src/tools"
-	"zipcode/src/utils"
 
 	"github.com/pmezard/go-difflib/difflib"
 )

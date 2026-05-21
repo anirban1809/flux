@@ -1,8 +1,8 @@
 package skills
 
 import (
+	"flux/src/workspace"
 	"strings"
-	"zipcode/src/workspace"
 )
 
 func Resolve(template, args string, ws *workspace.Workspace) string {

@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"zipcode/src/config"
-	"zipcode/src/llm/errors"
-	"zipcode/src/tools"
-	"zipcode/src/utils"
+	"flux/src/config"
+	"flux/src/llm/errors"
+	"flux/src/tools"
+	"flux/src/utils"
 
 	"github.com/joho/godotenv"
 )

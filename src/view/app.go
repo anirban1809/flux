@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"zipcode/src/agent"
-	"zipcode/src/config"
-	"zipcode/src/events"
-	view "zipcode/src/view/components"
-	"zipcode/src/view/viewctx"
-	"zipcode/src/workspace"
+	"flux/src/agent"
+	"flux/src/config"
+	"flux/src/events"
+	view "flux/src/view/components"
+	"flux/src/view/viewctx"
+	"flux/src/workspace"
 
 	"github.com/anirban1809/tuix/tuix"
 	"github.com/anirban1809/tuix/tuix/components"
@@ -44,7 +44,9 @@ func App(props tuix.Props) tuix.Element {
 	yoloRequested, _ := props.Get("yoloRequested").(bool)
 	yoloConfirmPending, setYoloConfirmPending := tuix.UseState(yoloRequested)
 	yoloConfirmSelected, setYoloConfirmSelected := tuix.UseState("")
-	yoloConfirmOptionSelected, setYoloConfirmOptionSelected := tuix.UseState(false)
+	yoloConfirmOptionSelected, setYoloConfirmOptionSelected := tuix.UseState(
+		false,
+	)
 
 	runtime := props.Get("runtime").(*agent.Runtime)
 
@@ -102,7 +104,8 @@ func App(props tuix.Props) tuix.Element {
 		setYoloConfirmPending(false)
 	}
 
-	if !yoloConfirmPending && tuix.CurrentKey.Rune == '\x19' { // ctrl+y toggles YOLO mode
+	if !yoloConfirmPending &&
+		tuix.CurrentKey.Rune == '\x19' { // ctrl+y toggles YOLO mode
 		config.Cfg.YoloMode = !config.Cfg.YoloMode
 	}
 

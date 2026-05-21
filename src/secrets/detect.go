@@ -39,13 +39,19 @@ func NewDetector() *Detector {
 		patterns: []categoryPattern{
 			// Provider keys (hard-block tier). Specific prefixes first so
 			// Anthropic/OpenRouter keys aren't classified as the generic OpenAI form.
-			{regexp.MustCompile(`sk-ant-[A-Za-z0-9_\-]{20,}`), CategoryProvider},
+			{
+				regexp.MustCompile(`sk-ant-[A-Za-z0-9_\-]{20,}`),
+				CategoryProvider,
+			},
 			{regexp.MustCompile(`sk-or-[A-Za-z0-9_\-]{20,}`), CategoryProvider},
 			{regexp.MustCompile(`sk-[A-Za-z0-9]{20,}`), CategoryProvider},
 
 			// AWS
 			{regexp.MustCompile(`AKIA[A-Z0-9]{16}`), CategoryAWS},
-			{regexp.MustCompile(`(?i)aws_secret_access_key\s*=\s*\S+`), CategoryAWS},
+			{
+				regexp.MustCompile(`(?i)aws_secret_access_key\s*=\s*\S+`),
+				CategoryAWS,
+			},
 
 			// GitHub
 			{regexp.MustCompile(`gh[pousr]_[A-Za-z0-9]{36}`), CategoryGitHub},
@@ -58,16 +64,24 @@ func NewDetector() *Detector {
 			{regexp.MustCompile(`pk_test_[A-Za-z0-9]{24,}`), CategoryStripe},
 
 			// Slack
-			{regexp.MustCompile(`xox[bpoars]-[A-Za-z0-9-]{10,}`), CategorySlack},
+			{
+				regexp.MustCompile(`xox[bpoars]-[A-Za-z0-9-]{10,}`),
+				CategorySlack,
+			},
 
 			// PEM private key blocks (multi-line, BEGIN through END).
-			{regexp.MustCompile(`(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----`), CategoryPEM},
+			{
+				regexp.MustCompile(
+					`(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----`,
+				),
+				CategoryPEM,
+			},
 		},
 	}
 }
 
 // Detect scans content for known credential formats and returns every match
-// with its byte range, category, and whether it is a ZipCode-provider key
+// with its byte range, category, and whether it is a flux-provider key
 // (the hard-block tier). Matches fully contained within a longer match are
 // removed; overlapping but non-contained matches are preserved.
 func (d *Detector) Detect(content string) []Match {
@@ -93,8 +107,8 @@ func (d *Detector) Detect(content string) []Match {
 // The match range covers the private_key value so the redactor scrubs the
 // actual secret rather than the surrounding JSON metadata.
 var (
-	gcpTypeMarker  = regexp.MustCompile(`"type"\s*:\s*"service_account"`)
-	gcpPrivateKey  = regexp.MustCompile(`(?s)"private_key"\s*:\s*"[^"]+"`)
+	gcpTypeMarker = regexp.MustCompile(`"type"\s*:\s*"service_account"`)
+	gcpPrivateKey = regexp.MustCompile(`(?s)"private_key"\s*:\s*"[^"]+"`)
 )
 
 func detectGCPServiceAccount(content string) []Match {

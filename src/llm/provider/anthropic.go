@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"zipcode/src/config"
-	"zipcode/src/llm/errors"
-	"zipcode/src/tools"
+	"flux/src/config"
+	"flux/src/llm/errors"
+	"flux/src/tools"
 )
 
 const anthropicAPIVersion = "2023-06-01"

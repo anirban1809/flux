@@ -3,13 +3,13 @@ package view
 import (
 	"fmt"
 
-	"zipcode/src/config"
-	"zipcode/src/credentials"
-	"zipcode/src/events"
-	llm "zipcode/src/llm/provider"
-	view "zipcode/src/ui/components/utils"
-	"zipcode/src/utils"
-	"zipcode/src/view/viewctx"
+	"flux/src/config"
+	"flux/src/credentials"
+	"flux/src/events"
+	llm "flux/src/llm/provider"
+	view "flux/src/ui/components/utils"
+	"flux/src/utils"
+	"flux/src/view/viewctx"
 
 	"github.com/anirban1809/tuix/tuix"
 	"github.com/anirban1809/tuix/tuix/components"

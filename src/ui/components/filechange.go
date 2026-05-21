@@ -1,24 +1,45 @@
 package components
 
 import (
+	"flux/src/tools"
 	"fmt"
 	"strings"
-	"zipcode/src/tools"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	diffAddedBg   = lipgloss.NewStyle().Background(lipgloss.Color("22")).Foreground(lipgloss.Color("10"))
-	diffRemovedBg = lipgloss.NewStyle().Background(lipgloss.Color("52")).Foreground(lipgloss.Color("9"))
+	diffAddedBg = lipgloss.NewStyle().
+			Background(lipgloss.Color("22")).
+			Foreground(lipgloss.Color("10"))
+	diffRemovedBg = lipgloss.NewStyle().
+			Background(lipgloss.Color("52")).
+			Foreground(lipgloss.Color("9"))
 	diffUnchanged = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	diffHunkSep   = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Italic(true)
-	diffFileLabel = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
-	diffOpBadge   = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Background(lipgloss.Color("236")).Padding(0, 1)
-	diffGutter    = lipgloss.NewStyle().Foreground(lipgloss.Color("239")).Width(4)
-	diffAddSign   = lipgloss.NewStyle().Background(lipgloss.Color("22")).Foreground(lipgloss.Color("2")).Width(2)
-	diffRemSign   = lipgloss.NewStyle().Background(lipgloss.Color("52")).Foreground(lipgloss.Color("1")).Width(2)
-	diffCtxSign   = lipgloss.NewStyle().Foreground(lipgloss.Color("239")).Width(2)
+	diffHunkSep   = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("69")).
+			Italic(true)
+	diffFileLabel = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("15"))
+	diffOpBadge = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Background(lipgloss.Color("236")).
+			Padding(0, 1)
+	diffGutter = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("239")).
+			Width(4)
+	diffAddSign = lipgloss.NewStyle().
+			Background(lipgloss.Color("22")).
+			Foreground(lipgloss.Color("2")).
+			Width(2)
+	diffRemSign = lipgloss.NewStyle().
+			Background(lipgloss.Color("52")).
+			Foreground(lipgloss.Color("1")).
+			Width(2)
+	diffCtxSign = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("239")).
+			Width(2)
 )
 
 type FileChangeViewer struct {
@@ -31,7 +52,10 @@ type FileChangeViewer struct {
 	MaxVisible   int
 }
 
-func CreateFileChangeViewer(fileName, changeType, content string, patches []tools.ParsedDiff) FileChangeViewer {
+func CreateFileChangeViewer(
+	fileName, changeType, content string,
+	patches []tools.ParsedDiff,
+) FileChangeViewer {
 	return FileChangeViewer{
 		FileName:     fileName,
 		ChangeType:   changeType,
@@ -78,7 +102,13 @@ func (f FileChangeViewer) getLines() []string {
 	case "patch":
 		for _, diff := range f.Patches {
 			for _, hunk := range diff.Hunks {
-				hunkHeader := fmt.Sprintf("  @@ -%d,%d +%d,%d @@", hunk.OldStart, hunk.OldCount, hunk.NewStart, hunk.NewCount)
+				hunkHeader := fmt.Sprintf(
+					"  @@ -%d,%d +%d,%d @@",
+					hunk.OldStart,
+					hunk.OldCount,
+					hunk.NewStart,
+					hunk.NewCount,
+				)
 				lines = append(lines, diffHunkSep.Render(hunkHeader))
 
 				oldLine := hunk.OldStart
@@ -86,13 +116,22 @@ func (f FileChangeViewer) getLines() []string {
 				for _, line := range hunk.Lines {
 					switch line.Kind {
 					case tools.DiffLineAdded:
-						lines = append(lines, renderDiffLine(line.Kind, line.Content))
+						lines = append(
+							lines,
+							renderDiffLine(line.Kind, line.Content),
+						)
 						newLine++
 					case tools.DiffLineRemoved:
-						lines = append(lines, renderDiffLine(line.Kind, line.Content))
+						lines = append(
+							lines,
+							renderDiffLine(line.Kind, line.Content),
+						)
 						oldLine++
 					default:
-						lines = append(lines, renderDiffLine(line.Kind, line.Content))
+						lines = append(
+							lines,
+							renderDiffLine(line.Kind, line.Content),
+						)
 						oldLine++
 						newLine++
 					}
@@ -129,7 +168,13 @@ func (f FileChangeViewer) View() string {
 
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(diffFileLabel.Render(f.FileName) + "  " + diffOpBadge.Render(f.ChangeType) + "\n")
+	sb.WriteString(
+		diffFileLabel.Render(
+			f.FileName,
+		) + "  " + diffOpBadge.Render(
+			f.ChangeType,
+		) + "\n",
+	)
 	sb.WriteString(diffUnchanged.Render(strings.Repeat("─", 60)) + "\n")
 
 	for _, line := range lines[start:end] {
@@ -139,7 +184,12 @@ func (f FileChangeViewer) View() string {
 	sb.WriteString(diffUnchanged.Render(strings.Repeat("─", 60)) + "\n")
 
 	if total > f.MaxVisible {
-		indicator := fmt.Sprintf("  lines %d-%d of %d  (w/s to scroll)", start+1, end, total)
+		indicator := fmt.Sprintf(
+			"  lines %d-%d of %d  (w/s to scroll)",
+			start+1,
+			end,
+			total,
+		)
 		sb.WriteString(diffUnchanged.Render(indicator) + "\n")
 	}
 

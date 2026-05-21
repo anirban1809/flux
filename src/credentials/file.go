@@ -2,9 +2,9 @@ package credentials
 
 import (
 	"errors"
+	"flux/src/config"
 	"os"
 	"path/filepath"
-	"zipcode/src/config"
 )
 
 func AtomicWrite(path string, contents []byte) error {

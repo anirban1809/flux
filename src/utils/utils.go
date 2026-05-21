@@ -3,13 +3,13 @@ package utils
 import (
 	"encoding/json"
 	"errors"
+	"flux/src/config"
+	"flux/src/tools"
 	"fmt"
 	"os"
 	"reflect"
 	"strings"
 	"time"
-	"zipcode/src/config"
-	"zipcode/src/tools"
 
 	"golang.org/x/term"
 )

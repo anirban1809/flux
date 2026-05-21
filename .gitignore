@@ -4,10 +4,10 @@ DESIGN.md
 .env
 logs.txt
 
-.zipcode
+.flux
 features
 
-.zipcode/sessions
+.flux/sessions
 .vscode
 
 benchmark/

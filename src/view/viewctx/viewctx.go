@@ -1,7 +1,7 @@
 package viewctx
 
 import (
-	"zipcode/src/agent"
+	"flux/src/agent"
 
 	"github.com/anirban1809/tuix/tuix"
 )

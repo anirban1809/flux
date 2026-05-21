@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	llm "zipcode/src/llm/provider"
-	"zipcode/src/secrets"
+	llm "flux/src/llm/provider"
+	"flux/src/secrets"
 )
 
-const sessionsDir = ".zipcode/sessions"
+const sessionsDir = ".flux/sessions"
 
 type Session struct {
 	ID        string        `json:"id"`

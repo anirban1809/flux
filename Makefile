@@ -1,14 +1,14 @@
 # ============================================================================
-# ZipCode – Makefile
+# flux – Makefile
 # TUI-first, single-binary Go application
 # ============================================================================
 
 # ---- Project metadata ------------------------------------------------------
-APP_NAME       := zipcode
+APP_NAME       := flux
 CMD_DIR        := .
 BIN_DIR        := ./bin
 DIST_DIR       := ./dist
-INSTALL_DIR    := $(HOME)/.zipcode/bin
+INSTALL_DIR    := $(HOME)/.flux/bin
 
 GO             := go
 GOFLAGS        :=
@@ -28,10 +28,10 @@ LD_META        := -X main.version=$(VERSION) \
 
 .PHONY: help
 help:
-	@echo "ZipCode – available targets:"
+	@echo "flux – available targets:"
 	@echo ""
-	@echo "  build        Build zipcode binary (local)"
-	@echo "  run          Run zipcode in dev mode"
+	@echo "  build        Build flux binary (local)"
+	@echo "  run          Run flux in dev mode"
 	@echo "  dev          Build + run with race detector"
 	@echo "  test         Run all tests"
 	@echo "  lint         Run static checks"

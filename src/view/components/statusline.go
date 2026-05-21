@@ -1,10 +1,10 @@
 package view
 
 import (
+	"flux/src/config"
+	llm "flux/src/llm/provider"
+	"flux/src/view/viewctx"
 	"fmt"
-	"zipcode/src/config"
-	llm "zipcode/src/llm/provider"
-	"zipcode/src/view/viewctx"
 
 	"github.com/anirban1809/tuix/tuix"
 )

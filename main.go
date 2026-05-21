@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"zipcode/src/agent"
-	"zipcode/src/config"
-	"zipcode/src/events"
-	llm "zipcode/src/llm/provider"
-	"zipcode/src/utils"
-	"zipcode/src/view"
-	"zipcode/src/workspace"
+	"flux/src/agent"
+	"flux/src/config"
+	"flux/src/events"
+	llm "flux/src/llm/provider"
+	"flux/src/utils"
+	"flux/src/view"
+	"flux/src/workspace"
 
 	"github.com/anirban1809/tuix/tuix"
 )
@@ -69,10 +69,15 @@ func main() {
 		&debugFlag,
 		"debug",
 		false,
-		"write verbose debug logs to ~/.zipcode/debug.log (headless only)",
+		"write verbose debug logs to ~/.flux/debug.log (headless only)",
 	)
 	flag.BoolVar(&debugFlag, "d", false, "alias for --debug")
-	flag.BoolVar(&yoloflag, "yolo", false, "auto-accept all file changes without prompting")
+	flag.BoolVar(
+		&yoloflag,
+		"yolo",
+		false,
+		"auto-accept all file changes without prompting",
+	)
 	flag.BoolVar(&yoloflag, "y", false, "alias for --yolo")
 	flag.Parse()
 
@@ -98,7 +103,13 @@ func main() {
 	app := tuix.NewApp(width, height)
 	app.Run(
 		view.App,
-		tuix.Props{Values: map[string]any{"runtime": &runtime, "wd": dir, "yoloRequested": yoloflag}},
+		tuix.Props{
+			Values: map[string]any{
+				"runtime":       &runtime,
+				"wd":            dir,
+				"yoloRequested": yoloflag,
+			},
+		},
 	)
 }
 
@@ -108,7 +119,7 @@ func setupDebugLog() {
 		fmt.Fprintf(os.Stderr, "debug: cannot determine home dir: %v\n", err)
 		return
 	}
-	path := filepath.Join(home, ".zipcode", "debug.log")
+	path := filepath.Join(home, ".flux", "debug.log")
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Fprintf(
@@ -189,7 +200,7 @@ func runHeadless(
 	if runtime.CurrentProvider == nil {
 		fmt.Fprintln(
 			os.Stderr,
-			"no active provider configured: set ActiveProviderName in ~/.zipcode/config.toml or pass --provider",
+			"no active provider configured: set ActiveProviderName in ~/.flux/config.toml or pass --provider",
 		)
 		os.Exit(1)
 	}
@@ -197,7 +208,7 @@ func runHeadless(
 	if _, ok := runtime.CredStore.Get(providerName); !ok {
 		fmt.Fprintf(
 			os.Stderr,
-			"no credentials for provider %q: configure ~/.zipcode/credentials.toml or set the provider's API key env var\n",
+			"no credentials for provider %q: configure ~/.flux/credentials.toml or set the provider's API key env var\n",
 			providerName,
 		)
 		os.Exit(1)

@@ -1,6 +1,6 @@
 package agent
 
-import "zipcode/src/events"
+import "flux/src/events"
 
 type Plan struct {
 	Title   string

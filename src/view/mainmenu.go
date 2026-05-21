@@ -4,10 +4,10 @@ import (
 	"os"
 	"strings"
 
-	"zipcode/src/events"
-	"zipcode/src/utils"
-	view "zipcode/src/view/components"
-	"zipcode/src/view/viewctx"
+	"flux/src/events"
+	"flux/src/utils"
+	view "flux/src/view/components"
+	"flux/src/view/viewctx"
 
 	"github.com/anirban1809/tuix/tuix"
 )

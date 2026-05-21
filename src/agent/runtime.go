@@ -6,15 +6,15 @@ import (
 	"os"
 	"strings"
 
-	"zipcode/src/config"
-	"zipcode/src/credentials"
-	"zipcode/src/events"
-	"zipcode/src/llm/prompts"
-	llm "zipcode/src/llm/provider"
-	"zipcode/src/skills"
-	"zipcode/src/tools"
-	"zipcode/src/utils"
-	"zipcode/src/workspace"
+	"flux/src/config"
+	"flux/src/credentials"
+	"flux/src/events"
+	"flux/src/llm/prompts"
+	llm "flux/src/llm/provider"
+	"flux/src/skills"
+	"flux/src/tools"
+	"flux/src/utils"
+	"flux/src/workspace"
 )
 
 // Represents the current status of the runtime
@@ -38,7 +38,7 @@ func traceTurn(turn int, format string, args ...any) {
 	}
 	fmt.Fprintf(
 		os.Stderr,
-		"[zipcode] turn %d: %s\n",
+		"[flux] turn %d: %s\n",
 		turn,
 		fmt.Sprintf(format, args...),
 	)

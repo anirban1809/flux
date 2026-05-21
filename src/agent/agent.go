@@ -1,11 +1,11 @@
 package agent
 
 import (
+	"flux/src/config"
+	"flux/src/credentials"
+	llm "flux/src/llm/provider"
+	"flux/src/tools"
 	"fmt"
-	"zipcode/src/config"
-	"zipcode/src/credentials"
-	llm "zipcode/src/llm/provider"
-	"zipcode/src/tools"
 )
 
 type Agent struct {

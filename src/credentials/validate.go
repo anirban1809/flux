@@ -1,9 +1,9 @@
 package credentials
 
 import (
+	llm "flux/src/llm/provider"
 	"fmt"
 	"time"
-	llm "zipcode/src/llm/provider"
 )
 
 type Validator struct {

@@ -1,10 +1,10 @@
-# ZipCode
+# flux
 
-A terminal-based AI coding assistant built with Go and tuix. ZipCode provides a TUI (Terminal User Interface) for interacting with AI models through OpenRouter, OpenAI, and Anthropic to perform code exploration, file manipulation, and task execution.
+A terminal-based AI coding assistant built with Go and tuix. flux provides a TUI (Terminal User Interface) for interacting with AI models through OpenRouter, OpenAI, and Anthropic to perform code exploration, file manipulation, and task execution.
 
 ## Overview
 
-ZipCode is a Go TUI application that provides an AI coding assistant interface with:
+flux is a Go TUI application that provides an AI coding assistant interface with:
 - Interactive terminal UI built with tuix
 - Real AI model integration via OpenRouter, OpenAI, and Anthropic
 - Tool execution (file operations, shell commands, code search)
@@ -37,13 +37,13 @@ ZipCode is a Go TUI application that provides an AI coding assistant interface w
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd zipcode
+cd flux
 
 # Build the binary
 make build
 
 # Run the application
-./bin/zipcode
+./bin/flux
 ```
 
 ### Development
@@ -77,7 +77,7 @@ make dist
 make run
 
 # Or run the built binary
-./bin/zipcode
+./bin/flux
 ```
 
 ### Basic Controls
@@ -90,7 +90,7 @@ make run
 
 ### Available Models
 
-ZipCode supports multiple providers. The default configuration uses `minimax/minimax-m2.5`.
+flux supports multiple providers. The default configuration uses `minimax/minimax-m2.5`.
 
 OpenRouter models include:
 - openai/gpt-5.2
@@ -135,7 +135,7 @@ The tool manifests exposed to the model are `subagent_code_explorer` and `subage
 ### Project Structure
 
 ```
-zipcode/
+flux/
 ├── main.go              # Application entry point
 ├── go.mod               # Go module definition
 ├── Makefile             # Build and development targets
@@ -192,10 +192,10 @@ zipcode/
 
 ## Configuration
 
-Configuration is stored under `~/.zipcode`:
-- `~/.zipcode/defaults.toml` - generated defaults
-- `~/.zipcode/config.toml` - user configuration
-- `~/.zipcode/credentials.toml` - stored provider API keys
+Configuration is stored under `~/.flux`:
+- `~/.flux/defaults.toml` - generated defaults
+- `~/.flux/config.toml` - user configuration
+- `~/.flux/credentials.toml` - stored provider API keys
 
 Supported API key environment variables:
 - `OPENROUTER_API_KEY` - API key for OpenRouter

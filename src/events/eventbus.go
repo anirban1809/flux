@@ -1,8 +1,8 @@
 package events
 
 import (
-	"zipcode/src/secrets"
-	"zipcode/src/tools"
+	"flux/src/secrets"
+	"flux/src/tools"
 )
 
 type ResponseEventType int

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"zipcode/src/config"
+	"flux/src/config"
 )
 
-const MainSystemPrompt string = `You are **ZipCode**, an AI coding agent running in the user's terminal.
+const MainSystemPrompt string = `You are **flux**, an AI coding agent running in the user's terminal.
 
 You are an interactive assistant that supports users with software development tasks. Follow the guidelines below and leverage the tools at your disposal to help the user effectively.
 IMPORTANT: Support authorized security assessments, defensive security work, CTF challenges, and learning contexts. Decline requests involving destructive techniques, denial-of-service attacks, mass targeting, supply chain attacks, or evasion of detection for malicious ends. Dual-use security tooling (C2 frameworks, credential testing, exploit development) requires explicit authorization context: penetration testing engagements, CTF competitions, security research, or defensive applications.
@@ -70,8 +70,8 @@ IMPORTANT: You must NEVER fabricate or guess URLs for the user unless you are ce
 * When referencing specific functions or code segments, include the pattern ` + "`path:line`" + ` to allow the user to navigate easily to the relevant source location.
 * Do not place a colon before tool calls. Your tool calls may not appear directly in the output, so text like "Let me read the file:" followed by a read tool call should instead be written as "Let me read the file." with a period.`
 
-// HeadlessSystemPrompt is appended after MainSystemPrompt when zipcode is
-// running non-interactively (``zipcode -p ...``). It overrides the
+// HeadlessSystemPrompt is appended after MainSystemPrompt when flux is
+// running non-interactively (“flux -p ...“). It overrides the
 // confirmation/handoff defaults that assume a human is watching.
 const HeadlessSystemPrompt string = `
 
@@ -142,9 +142,15 @@ func BuildSystemPrompt(ws WorkspaceContext, skills []SkillSummary) string {
 
 	if len(skills) > 0 {
 		sb.WriteString("\n\n## Available Skills\n")
-		sb.WriteString("Skills are reusable prompt templates registered in this workspace. ")
-		sb.WriteString("To use one, call the `invoke_skill` tool with `skill_name` set to the skill name (no leading slash). ")
-		sb.WriteString("The resolved skill prompt will be injected as the next user turn; act on it directly.\n\n")
+		sb.WriteString(
+			"Skills are reusable prompt templates registered in this workspace. ",
+		)
+		sb.WriteString(
+			"To use one, call the `invoke_skill` tool with `skill_name` set to the skill name (no leading slash). ",
+		)
+		sb.WriteString(
+			"The resolved skill prompt will be injected as the next user turn; act on it directly.\n\n",
+		)
 		for _, s := range skills {
 			desc := s.Description
 			if desc == "" {

@@ -3,10 +3,10 @@ package view
 import (
 	"fmt"
 
-	"zipcode/src/config"
-	"zipcode/src/events"
-	llm "zipcode/src/llm/provider"
-	"zipcode/src/view/viewctx"
+	"flux/src/config"
+	"flux/src/events"
+	llm "flux/src/llm/provider"
+	"flux/src/view/viewctx"
 
 	"github.com/anirban1809/tuix/tuix"
 )

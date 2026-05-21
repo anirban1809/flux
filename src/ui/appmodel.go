@@ -1,14 +1,14 @@
 package ui
 
 import (
+	"flux/src/agent"
+	"flux/src/config"
+	"flux/src/events"
+	"flux/src/ui/components"
+	"flux/src/utils"
+	"flux/src/workspace"
 	"fmt"
 	"strings"
-	"zipcode/src/agent"
-	"zipcode/src/config"
-	"zipcode/src/events"
-	"zipcode/src/ui/components"
-	"zipcode/src/utils"
-	"zipcode/src/workspace"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -53,7 +53,7 @@ func Iniaitalize(workspace *workspace.Workspace) AppModel {
 	runtime := agent.NewRuntime(workspace)
 
 	commands := []string{"/models", "/help", "/exit"}
-	commandDescriptions := []string{"Select model", "Get help", "Exit ZipCode"}
+	commandDescriptions := []string{"Select model", "Get help", "Exit flux"}
 
 	models := config.Cfg.ModelNames
 
@@ -67,8 +67,11 @@ func Iniaitalize(workspace *workspace.Workspace) AppModel {
 		Commands:            commands,
 		CommandDescriptions: commandDescriptions,
 		Models:              models,
-		StatusBar:           components.CreateStatusBar(workspace.RootPath, config.Cfg.CurrentModel),
-		ActiveConversation:  "\n",
+		StatusBar: components.CreateStatusBar(
+			workspace.RootPath,
+			config.Cfg.CurrentModel,
+		),
+		ActiveConversation: "\n",
 	}
 }
 
@@ -95,7 +98,10 @@ func (a *AppModel) ProcessQuestion() {
 
 	a.Question.Visible = false
 	a.FileChangeViewer.Visible = false
-	events.EventManager.WriteToChannel(events.AGENT_INPUT_CHANNEL, a.Question.GetSelectedItem())
+	events.EventManager.WriteToChannel(
+		events.AGENT_INPUT_CHANNEL,
+		a.Question.GetSelectedItem(),
+	)
 	a.Question.Selected = false
 }
 
@@ -324,13 +330,16 @@ func (a AppModel) renderPromptArea(width int) string {
 	var hint string
 	if a.PromptExpanded {
 		visibleLines = lines
-		hint = dimStyle.Render(fmt.Sprintf("  %d lines  ctrl+e: collapse ▲", len(lines)))
+		hint = dimStyle.Render(
+			fmt.Sprintf("  %d lines  ctrl+e: collapse ▲", len(lines)),
+		)
 	} else {
 		visibleLines = lines[len(lines)-3:]
 		hint = dimStyle.Render(fmt.Sprintf("  %d lines  ctrl+e: expand ▼", len(lines)))
 	}
 
-	preview := bgStyle.Padding(1, 1, 0, 1).Render(strings.Join(visibleLines, "\n"))
+	preview := bgStyle.Padding(1, 1, 0, 1).
+		Render(strings.Join(visibleLines, "\n"))
 	inputLine := bgStyle.Padding(0, 1, 1, 1).Render(a.Prompt.View())
 
 	return preview + "\n" + hint + "\n" + inputLine

@@ -4,16 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flux/src/config"
+	"flux/src/events"
+	"flux/src/llm/errors"
+	"flux/src/tools"
+	"flux/src/utils"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-	"zipcode/src/config"
-	"zipcode/src/events"
-	"zipcode/src/llm/errors"
-	"zipcode/src/tools"
-	"zipcode/src/utils"
 )
 
 type OpenAI struct {
