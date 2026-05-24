@@ -24,6 +24,7 @@ type Executor struct {
 	SubAgentRunning bool
 	SubAgent        string
 	ActiveSkill     string
+	PlanActive      bool
 }
 
 func (e *Executor) IsSubagentTool(name string) bool {
@@ -109,6 +110,14 @@ func (e *Executor) SetActiveSkill(name string) {
 	e.ActiveSkill = name
 }
 
+func (e *Executor) SetPlanActive(active bool) {
+	e.PlanActive = active
+}
+
+func (e *Executor) EmitMessage(content string) {
+	e.pushEvent(events.Message, content)
+}
+
 func (e *Executor) ProcessResponse(
 	response llm.Message,
 ) ([]ExecutionAction, ExecutionResultStatus, error) {
@@ -122,7 +131,7 @@ func (e *Executor) ProcessResponse(
 	}
 
 	if response.ToolCalls == nil && strings.TrimSpace(response.Content) != "" {
-		if !e.SubAgentRunning {
+		if !e.SubAgentRunning && !e.PlanActive {
 			e.pushEvent(events.Message, response.Content)
 		}
 		return nil, ExecutionCompleted, nil
@@ -205,19 +214,19 @@ func (e *Executor) GetToolCallCommand(
 ) (string, []string, error) {
 	internaltool, err1 := GetTool(config.Cfg.InternalToolPath, input.Name)
 	externaltool, err2 := GetTool(config.Cfg.ExternalToolPath, input.Name)
-	var toolPath string
-	var tool tools.Tool
-
-	if err1 != nil {
-		tool = externaltool
-		toolPath = config.Cfg.ExternalToolPath
-	} else if err2 != nil {
-		tool = internaltool
-		toolPath = config.Cfg.InternalToolPath
-	}
 
 	if err1 != nil && err2 != nil {
 		return "", []string{}, errors.New("failed to get tool")
+	}
+
+	var tool tools.Tool
+	var toolPath string
+	if err1 == nil {
+		tool = internaltool
+		toolPath = config.Cfg.InternalToolPath
+	} else {
+		tool = externaltool
+		toolPath = config.Cfg.ExternalToolPath
 	}
 
 	command := fmt.Sprintf(
@@ -227,15 +236,24 @@ func (e *Executor) GetToolCallCommand(
 		input.Name,
 	)
 
+	var rawArgs map[string]any
+	if err := json.Unmarshal(input.Arguments, &rawArgs); err != nil {
+		return "", []string{}, fmt.Errorf("invalid arguments for %s: %w", input.Name, err)
+	}
+
 	argValues := []string{}
 
 	for _, param := range tool.Function.Parameters.Required {
-		var args map[string]any
-		if err := json.Unmarshal(input.Arguments, &args); err != nil {
-			fmt.Println("Error:", err)
+		var arg string
+		switch v := rawArgs[param].(type) {
+		case string:
+			arg = strings.ReplaceAll(v, `"`, `\"`)
+		case nil:
+			// missing required param — pass empty string
+		default:
+			b, _ := json.Marshal(v)
+			arg = strings.ReplaceAll(string(b), `"`, `\"`)
 		}
-
-		arg := strings.ReplaceAll(args[param].(string), "\"", "\\\"")
 		argValues = append(argValues, arg)
 
 		command = fmt.Sprintf(

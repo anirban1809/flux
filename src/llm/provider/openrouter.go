@@ -39,6 +39,7 @@ type OpenRouterRequest struct {
 	MaxCompletionTokens int                    `json:"max_completion_tokens,omitempty"`
 	Stop                []string               `json:"stop,omitempty"`
 	Stream              bool                   `json:"stream,omitempty"`
+	StreamOptions       *StreamOptions         `json:"stream_options,omitempty"`
 	User                string                 `json:"user,omitempty"`
 	SessionID           string                 `json:"session_id,omitempty"`
 	Modalities          []string               `json:"modalities,omitempty"`
@@ -134,6 +135,12 @@ type CostDetails struct {
 type CompletionTokensDetails struct {
 	ReasoningTokens int `json:"reasoning_tokens"`
 	AudioTokens     int `json:"audio_tokens"`
+}
+
+type OpenRouterApiError struct {
+	Error struct {
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
 func (p *OpenRouterProvider) SetModel(model string, nitro bool) {
@@ -238,67 +245,75 @@ func (p *OpenRouterProvider) Complete(
 ) (ChatResponse, error) {
 	godotenv.Load()
 
-	retry := true
+	requestBody := OpenRouterRequest{
+		Model:               config.Cfg.CurrentModel,
+		Messages:            request.Messages,
+		Stream:              config.Cfg.StreamResponses,
+		Tools:               request.Tools,
+		MaxTokens:           8192,
+		MaxCompletionTokens: 2048,
+	}
+	if config.Cfg.StreamResponses {
+		requestBody.StreamOptions = &StreamOptions{IncludeUsage: true}
+	}
+
+	value, err := json.Marshal(requestBody)
+	if err != nil {
+		return ChatResponse{}, err
+	}
+
+	res, err := errors.RetryWithBackoff(p, func() (*http.Response, error) {
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"https://openrouter.ai/api/v1/chat/completions",
+			bytes.NewReader(value),
+		)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(
+			"Authorization",
+			fmt.Sprintf("Bearer %s", p.ApiKey),
+		)
+		return http.DefaultClient.Do(req)
+	})
+	if err != nil {
+		return ChatResponse{}, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 400 {
+		body, _ := io.ReadAll(res.Body)
+		var error OpenRouterApiError
+		json.Unmarshal(body, &error)
+		return ChatResponse{}, fmt.Errorf(
+			"Openrouter error: %s",
+			error.Error.Message,
+		)
+	}
+
+	if config.Cfg.StreamResponses {
+		output := ParseStreamResponse(res.Body)
+		utils.LogValue(output)
+		return output, nil
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return ChatResponse{}, err
+	}
+
 	var finalResponse OpenRouterResponse
+	if err := json.Unmarshal(body, &finalResponse); err != nil {
+		return ChatResponse{}, err
+	}
 
-	for retry {
-		requestBody := OpenRouterRequest{
-			Model:               config.Cfg.CurrentModel,
-			Messages:            request.Messages,
-			Stream:              true,
-			Tools:               request.Tools,
-			MaxTokens:           8192,
-			MaxCompletionTokens: 2048,
-		}
-
-		value, err := json.Marshal(requestBody)
-		if err != nil {
-			return ChatResponse{}, err
-		}
-
-		res, err := errors.RetryWithBackoff(p, func() (*http.Response, error) {
-			req, err := http.NewRequest(
-				http.MethodPost,
-				"https://openrouter.ai/api/v1/chat/completions",
-				bytes.NewReader(value),
-			)
-			if err != nil {
-				return nil, err
-			}
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set(
-				"Authorization",
-				fmt.Sprintf("Bearer %s", p.ApiKey),
-			)
-			return http.DefaultClient.Do(req)
-		})
-		if err != nil {
-			return ChatResponse{}, err
-		}
-
-		defer res.Body.Close()
-
-		if config.Cfg.StreamResponses {
-			output := ParseStreamResponse(res.Body)
-			utils.LogValue(output)
-			return output, nil
-		}
-
-		body, err := io.ReadAll(res.Body)
-
-		if err != nil {
-			return ChatResponse{}, err
-		}
-
-		if err := json.Unmarshal(body, &finalResponse); err != nil {
-			return ChatResponse{}, err
-		}
-
-		if len(finalResponse.Choices) > 0 {
-			retry = false
-		} else {
-			fmt.Println("retrying", string(body))
-		}
+	if len(finalResponse.Choices) == 0 {
+		return ChatResponse{}, fmt.Errorf(
+			"openrouter: empty choices in response: %s",
+			string(body),
+		)
 	}
 
 	return ChatResponse{

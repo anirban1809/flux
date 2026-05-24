@@ -61,6 +61,11 @@ type PlanStatusEvent struct {
 	Current int
 	Active  bool
 }
+type CompactionEvent struct {
+	InputTokensBefore  int
+	OutputTokensBefore int
+}
+
 type EventsManager struct {
 	agentOutput   chan ResponseEvent
 	agentInput    chan string
@@ -69,6 +74,7 @@ type EventsManager struct {
 	notification  chan Notification
 	planStatus    chan PlanStatusEvent
 	streamChunk   chan string
+	compaction    chan CompactionEvent
 	err           chan string
 }
 
@@ -83,6 +89,7 @@ const (
 	AGENT_ERROR_CHANNEL
 	PLAN_STATUS_CHANNEL
 	STREAM_CHUNK_CHANNEL
+	COMPACTION_CHANNEL
 )
 
 type NotificationType int
@@ -128,6 +135,10 @@ func (e *EventsManager) WriteToChannel(channelType ChannelType, data any) {
 
 	case STREAM_CHUNK_CHANNEL:
 		e.streamChunk <- data.(string)
+		return
+
+	case COMPACTION_CHANNEL:
+		e.compaction <- data.(CompactionEvent)
 	}
 }
 
@@ -153,6 +164,9 @@ func (e *EventsManager) ReadFromChannel(channelType ChannelType) any {
 
 	case STREAM_CHUNK_CHANNEL:
 		return <-e.streamChunk
+
+	case COMPACTION_CHANNEL:
+		return <-e.compaction
 	}
 
 	return nil
@@ -169,5 +183,6 @@ func CreateEventManager() EventsManager {
 		notification:  make(chan Notification),
 		planStatus:    make(chan PlanStatusEvent, 8),
 		streamChunk:   make(chan string),
+		compaction:    make(chan CompactionEvent, 1),
 	}
 }

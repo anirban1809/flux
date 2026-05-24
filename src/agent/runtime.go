@@ -217,6 +217,7 @@ func (r *Runtime) maybeAutoCompact() {
 		},
 	)
 
+	tokensBefore := r.InputTokens + r.OutputTokens
 	if _, err := r.Compact(); err != nil {
 		go events.EventManager.WriteToChannel(
 			events.NOTIFICATION_CHANNEL,
@@ -234,8 +235,11 @@ func (r *Runtime) maybeAutoCompact() {
 	go events.EventManager.WriteToChannel(
 		events.NOTIFICATION_CHANNEL,
 		events.Notification{
-			Type:    events.INFO,
-			Message: "Conversation compacted.",
+			Type: events.INFO,
+			Message: fmt.Sprintf(
+				"Auto-compacted: %d tokens condensed.",
+				tokensBefore,
+			),
 		},
 	)
 }
@@ -297,6 +301,9 @@ func (r *Runtime) Compact() (string, error) {
 		return "", fmt.Errorf("provider returned empty summary")
 	}
 
+	inputBefore := r.InputTokens
+	outputBefore := r.OutputTokens
+
 	r.Agent.Conversation.Messages = []llm.Message{
 		{Role: "system", Content: r.Agent.SystemPrompt},
 		{
@@ -313,6 +320,14 @@ func (r *Runtime) Compact() (string, error) {
 	r.CachedInputTokens = 0
 	r.CacheWriteTokens = 0
 	r.OutputTokens = 0
+
+	go events.EventManager.WriteToChannel(
+		events.COMPACTION_CHANNEL,
+		events.CompactionEvent{
+			InputTokensBefore:  inputBefore,
+			OutputTokensBefore: outputBefore,
+		},
+	)
 
 	r.persistSessionHistory()
 	return summary, nil
@@ -534,6 +549,7 @@ func (r *Runtime) handlePlanAction(
 	}
 
 	r.activePlan = newPlan(args.Title, args.Steps)
+	r.Executor.SetPlanActive(true)
 	r.emitPlanStatus()
 
 	firstPrompt, err := r.generateStepPrompt(0)
@@ -824,7 +840,9 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 
 				if r.activePlan.Current >= len(r.activePlan.Steps) {
 					r.activePlan.Active = false
+					r.Executor.SetPlanActive(false)
 					r.emitPlanStatus()
+					r.Executor.EmitMessage(lastResponse.Content)
 					r.Status = Idle
 					break
 				}
@@ -833,6 +851,7 @@ func (r *Runtime) Run(prompt string) (*llm.Message, error) {
 				if perr != nil {
 					r.activePlan.Steps[r.activePlan.Current].Status = events.PlanStepFailed
 					r.activePlan.Active = false
+					r.Executor.SetPlanActive(false)
 					r.emitPlanStatus()
 					go events.EventManager.WriteToChannel(
 						events.NOTIFICATION_CHANNEL,
