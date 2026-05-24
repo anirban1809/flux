@@ -33,6 +33,7 @@ type Config struct {
 	ActiveProviderName    string            `toml:"active_provider_name"`
 	ProviderModels        map[string]string `toml:"provider_models"`
 	StreamResponses       bool              `toml:"stream_responses"`
+	AllowedDirs           []string          `toml:"allowed_dirs"`
 }
 
 var Cfg = &Config{}
@@ -63,11 +64,11 @@ func defaults() *Config {
 		},
 		CurrentModel:          "minimax/minimax-m2.5",
 		MaxHeadlessTurns:      100,
-		InternalToolPath:      "/Users/anirban/Documents/Code/flux/src/tools",
+		InternalToolPath:      "./src/tools",
 		ExternalToolPath:      "~/.flux/tools",
-		InternalSubagentsPath: "/Users/anirban/Documents/Code/flux/src/subagents",
+		InternalSubagentsPath: "./src/subagents",
 		ExternalSubagentsPath: "~/.flux/tools",
-		InternalSkillsPath:    "/Users/anirban/Documents/Code/flux/src/skills/builtin",
+		InternalSkillsPath:    "./src/skills/builtin",
 		GlobalSkillsPath:      "~/.flux/skills",
 		ProjectSkillsPath:     ".flux/skills",
 		SkillsStatePath:       "~/.flux/skills.state.json",
@@ -76,6 +77,7 @@ func defaults() *Config {
 		ConfigPath:            "~/.flux/config.toml",
 		ProviderModels:        map[string]string{},
 		StreamResponses:       true,
+		AllowedDirs:           []string{},
 	}
 }
 
@@ -151,6 +153,23 @@ func (c *Config) Save() error {
 		return err
 	}
 	return writeTOML(filepath.Join(dir, "config.toml"), c)
+}
+
+func (c *Config) IsDirTrusted(dir string) bool {
+	dir = filepath.Clean(dir)
+	for _, allowed := range c.AllowedDirs {
+		allowed = filepath.Clean(allowed)
+		if dir == allowed ||
+			strings.HasPrefix(dir, allowed+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) TrustDir(dir string) error {
+	c.AllowedDirs = append(c.AllowedDirs, filepath.Clean(dir))
+	return c.Save()
 }
 
 func (c *Config) SetCurrentModel(model string) {

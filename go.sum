@@ -2,6 +2,14 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/anirban1809/tuix v0.0.21 h1:bLxbHrBrg4w/EoN1Zz1zPdY4f+HduozxuOcKCnAVLmM=
 github.com/anirban1809/tuix v0.0.21/go.mod h1:ubWGNAjEg8grITDEI2iwTCHKGE5qnt4RAp4VhZEJ+eM=
+github.com/anirban1809/tuix v0.0.22 h1:NEYjRGss85ST0NTURmvfa206zu9jy+p6eBCGCF4SmuI=
+github.com/anirban1809/tuix v0.0.22/go.mod h1:ubWGNAjEg8grITDEI2iwTCHKGE5qnt4RAp4VhZEJ+eM=
+github.com/anirban1809/tuix v0.0.23 h1:5eCUPg65g5FoUCjcKNjC5QUPH92oL33S7FjSYKQLSGE=
+github.com/anirban1809/tuix v0.0.23/go.mod h1:ubWGNAjEg8grITDEI2iwTCHKGE5qnt4RAp4VhZEJ+eM=
+github.com/anirban1809/tuix v0.0.24 h1:hwdwLIx49tVUzAba9JlRGsf5d81SGrgERl6j9jeiiG0=
+github.com/anirban1809/tuix v0.0.24/go.mod h1:ubWGNAjEg8grITDEI2iwTCHKGE5qnt4RAp4VhZEJ+eM=
+github.com/anirban1809/tuix v0.0.25 h1:1Htuq86ZoqEQM412oFTOeTPDABBSYUtcC67LG8PK2LA=
+github.com/anirban1809/tuix v0.0.25/go.mod h1:ubWGNAjEg8grITDEI2iwTCHKGE5qnt4RAp4VhZEJ+eM=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=
@@ -63,6 +71,8 @@ golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.44.0 h1:ildZl3J4uzeKP07r2F++Op7E9B29JRUy+a27EibtBTQ=
 golang.org/x/sys v0.44.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+golang.org/x/sys v0.45.0 h1:dO4czNzziLiiXplLQgBCEpCvXQ3dnkn0SdaZSYdQ+FY=
+golang.org/x/sys v0.45.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
 golang.org/x/term v0.43.0 h1:S4RLU2sB31O/NCl+zFN9Aru9A/Cq2aqKpTZJ6B+DwT4=
 golang.org/x/term v0.43.0/go.mod h1:lrhlHNdQJHO+1qVYiHfFKVuVioJIheAc3fBSMFYEIsk=
 golang.org/x/text v0.31.0 h1:aC8ghyu4JhP8VojJ2lEHBnochRno1sgL6nEi9WGFGMM=

@@ -20,6 +20,13 @@ import (
 )
 
 func main() {
+	defer func() {
+		if v := recover(); v != nil {
+			config.WritePanicLog(v)
+			os.Exit(2)
+		}
+	}()
+
 	if err := config.Load(); err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
@@ -140,6 +147,12 @@ func runHeadless(
 	maxTurnsOverride int,
 	debug bool, yolo bool,
 ) {
+	defer func() {
+		if v := recover(); v != nil {
+			config.WritePanicLog(v)
+			os.Exit(2)
+		}
+	}()
 
 	config.Cfg.YoloMode = yolo
 

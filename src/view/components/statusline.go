@@ -2,6 +2,7 @@ package view
 
 import (
 	"flux/src/config"
+	"flux/src/events"
 	llm "flux/src/llm/provider"
 	"flux/src/view/viewctx"
 	"fmt"
@@ -48,6 +49,8 @@ func StatusLine(props tuix.Props) tuix.Element {
 		cachedInputTokens = inputTokens
 	}
 	totalTokens := inputTokens + outputTokens
+
+	lastCompaction, _ := props.Get("lastCompaction").(events.CompactionEvent)
 
 	branchStyle := tuix.NewStyle()
 	if hasUncommittedChanges {
@@ -110,6 +113,14 @@ func StatusLine(props tuix.Props) tuix.Element {
 		contextPctText = "Context: -"
 	}
 
+	var compactionBadge string
+	if lastCompaction.InputTokensBefore > 0 || lastCompaction.OutputTokensBefore > 0 {
+		compactionBadge = fmt.Sprintf(
+			" [compacted from %dk]",
+			(lastCompaction.InputTokensBefore+lastCompaction.OutputTokensBefore)/1000,
+		)
+	}
+
 	line1 := tuix.Box(
 		tuix.Props{Direction: tuix.Row, Justify: tuix.JustifySpaceBetween},
 		tuix.NewStyle(),
@@ -117,15 +128,20 @@ func StatusLine(props tuix.Props) tuix.Element {
 			fmt.Sprintf("%s | %s (%s)", status, workspacePath, branch),
 			branchStyle,
 		),
-		tuix.Text(
-			fmt.Sprintf(
-				"Tokens:  %d\u2191 / %d\u2193 (%d)%s",
-				inputTokens,
-				outputTokens,
-				totalTokens,
-				costText,
-			),
+		tuix.Box(
+			tuix.Props{Direction: tuix.Row},
 			tuix.NewStyle(),
+			tuix.Text(
+				fmt.Sprintf(
+					"Tokens:  %d\u2191 / %d\u2193 (%d)%s",
+					inputTokens,
+					outputTokens,
+					totalTokens,
+					costText,
+				),
+				tuix.NewStyle(),
+			),
+			tuix.Text(compactionBadge, tuix.NewStyle().Foreground(tuix.Hex("#9ad8ff"))),
 		),
 	)
 

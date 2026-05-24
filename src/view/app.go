@@ -38,6 +38,9 @@ func App(props tuix.Props) tuix.Element {
 	optionSelected, setOptionSelected := tuix.UseState(false)
 	fileDiff, setFileDiff := tuix.UseState(events.FileChangeEvent{})
 	focusPrompt, setFocusPrompt := tuix.UseState(true)
+	furtherInstructionsMode, setFurtherInstructionsMode := tuix.UseState(false)
+	furtherInstructionsValue, setFurtherInstructionsValue := tuix.UseState("")
+	lastCompaction, setLastCompaction := tuix.UseState(events.CompactionEvent{})
 	planStatus, setPlanStatus := tuix.UseState(events.PlanStatusEvent{})
 	queuedCount, setQueuedCount := tuix.UseState(0)
 
@@ -47,6 +50,11 @@ func App(props tuix.Props) tuix.Element {
 	yoloConfirmOptionSelected, setYoloConfirmOptionSelected := tuix.UseState(
 		false,
 	)
+
+	wd := props.Get("wd").(string)
+	trustPending, setTrustPending := tuix.UseState(!config.Cfg.IsDirTrusted(wd))
+	trustSelected, setTrustSelected := tuix.UseState("")
+	trustOptionSelected, setTrustOptionSelected := tuix.UseState(false)
 
 	runtime := props.Get("runtime").(*agent.Runtime)
 
@@ -68,6 +76,11 @@ func App(props tuix.Props) tuix.Element {
 		}
 
 		go func() {
+			defer func() {
+				if v := recover(); v != nil {
+					config.WritePanicLog(v)
+				}
+			}()
 			if _, err := runtime.Run(send); err != nil {
 				events.EventManager.WriteToChannel(
 					events.NOTIFICATION_CHANNEL,
@@ -96,6 +109,16 @@ func App(props tuix.Props) tuix.Element {
 		}
 	}
 
+	if trustOptionSelected {
+		if trustSelected == "Yes, trust directory" {
+			config.Cfg.TrustDir(wd) //nolint:errcheck
+			setTrustPending(false)
+		} else {
+			tuix.Exit()
+		}
+		setTrustOptionSelected(false)
+	}
+
 	if yoloConfirmOptionSelected {
 		if yoloConfirmSelected == "Yes, enable YOLO mode" {
 			config.Cfg.YoloMode = true
@@ -109,7 +132,27 @@ func App(props tuix.Props) tuix.Element {
 		config.Cfg.YoloMode = !config.Cfg.YoloMode
 	}
 
-	canSubmit := tuix.CurrentKey.Code == tuix.KeyEnter && !menuVisible
+	if furtherInstructionsMode {
+		if tuix.CurrentKey.Code == tuix.KeyEnter {
+			val := strings.TrimSpace(furtherInstructionsValue)
+			if val != "" {
+				go events.EventManager.WriteToChannel(
+					events.AGENT_INPUT_CHANNEL,
+					val,
+				)
+				setFurtherInstructionsMode(false)
+				setFurtherInstructionsValue("")
+				setQuestionVisible(false)
+			}
+		}
+		if tuix.CurrentKey.Code == tuix.KeyEscape {
+			setFurtherInstructionsMode(false)
+			setFurtherInstructionsValue("")
+		}
+	}
+
+	canSubmit := tuix.CurrentKey.Code == tuix.KeyEnter && !menuVisible &&
+		!furtherInstructionsMode
 	if canSubmit {
 		if !activeSession {
 			submitPrompt(prompt)
@@ -120,6 +163,11 @@ func App(props tuix.Props) tuix.Element {
 
 	tuix.UseEffect(func() func() {
 		go func() {
+			defer func() {
+				if v := recover(); v != nil {
+					config.WritePanicLog(v)
+				}
+			}()
 			var activeSubAgent string
 			var activeSkill string
 			agentOut := make(chan events.ResponseEvent)
@@ -131,6 +179,15 @@ func App(props tuix.Props) tuix.Element {
 							events.FILE_DIFF_CHANNEL,
 						).(events.FileChangeEvent),
 					)
+				}
+			}()
+
+			go func() {
+				for {
+					ev := events.EventManager.ReadFromChannel(
+						events.COMPACTION_CHANNEL,
+					).(events.CompactionEvent)
+					setLastCompaction(ev)
 				}
 			}()
 
@@ -336,6 +393,23 @@ func App(props tuix.Props) tuix.Element {
 		return func() {}
 	}, []any{})
 
+	if trustPending {
+		return viewctx.MainContext.Provide(
+			&viewctx.ContextType{
+				Runtime:        runtime,
+				SetFocusPrompt: setFocusPrompt,
+			}, func() tuix.Element {
+				return view.TrustConfirm(tuix.Props{Values: map[string]any{
+					"dir": wd,
+					"onChange": func(selected string, _ int) {
+						setTrustSelected(selected)
+						setTrustOptionSelected(true)
+					},
+				}})
+			},
+		)
+	}
+
 	if yoloConfirmPending {
 		return viewctx.MainContext.Provide(
 			&viewctx.ContextType{
@@ -376,30 +450,61 @@ func App(props tuix.Props) tuix.Element {
 			}
 
 			if questionVisible {
-				children = append(
-					children, tuix.Box(
-						tuix.Props{Direction: tuix.Column},
-						tuix.NewStyle(),
-						tuix.Text("", tuix.NewStyle()),
-						view.FileDiff(
+				const furtherInstructionsSentinel = "Further instructions..."
+				questionChildren := []tuix.Element{
+					tuix.Text("", tuix.NewStyle()),
+					view.FileDiff(
+						tuix.Props{
+							Values: map[string]any{"fileDiff": fileDiff},
+						},
+					),
+					tuix.Text("", tuix.NewStyle()),
+					tuix.WrappedText(question.question, tuix.NewStyle()),
+				}
+				if furtherInstructionsMode {
+					questionChildren = append(questionChildren,
+						tuix.Box(
 							tuix.Props{
-								Values: map[string]any{"fileDiff": fileDiff},
+								Direction: tuix.Row,
+								Padding:   [4]int{0, 1, 0, 1},
 							},
+							tuix.NewStyle().Border(tuix.Border{
+								Top: true, Bottom: true,
+								Color: tuix.Hex("#646464"),
+							}),
+							components.Input(
+								">",
+								true,
+								furtherInstructionsValue,
+								func(value string) { setFurtherInstructionsValue(value) },
+							),
 						),
-						tuix.Text("", tuix.NewStyle()),
-						tuix.Text(question.question, tuix.NewStyle()),
+					)
+				} else {
+					allOptions := append(question.options, furtherInstructionsSentinel)
+					questionChildren = append(questionChildren,
 						view.Menu(
 							tuix.Props{Values: map[string]any{
-								"items":            question.options,
+								"items":            allOptions,
 								"setSelectedIndex": setSelectedOption,
 								"visible":          questionVisible,
 							}},
 							func(selected string, _ int) {
-								setOptionSelected(true)
-								setSelectedOption(selected)
+								if selected == furtherInstructionsSentinel {
+									setFurtherInstructionsMode(true)
+								} else {
+									setOptionSelected(true)
+									setSelectedOption(selected)
+								}
 							}, nil,
 						),
-					))
+					)
+				}
+				children = append(children, tuix.Box(
+					tuix.Props{Direction: tuix.Column},
+					tuix.NewStyle(),
+					questionChildren...,
+				))
 			}
 
 			if optionSelected {
@@ -421,13 +526,13 @@ func App(props tuix.Props) tuix.Element {
 			notificationEl := tuix.Box(
 				tuix.Props{Padding: [4]int{1, 0, 0, 0}},
 				tuix.NewStyle().Foreground(tuix.Hex("#9ad8ff")),
-				tuix.Text(notification.Message, notificationStyle),
+				tuix.WrappedText(notification.Message, notificationStyle),
 			)
 			if notification.Message != "" {
 				children = append(children, notificationEl)
 			}
 
-			if len(planStatus.Steps) > 0 {
+			if planStatus.Active && len(planStatus.Steps) > 0 {
 				children = append(children, view.PlanView(tuix.Props{
 					Values: map[string]any{"plan": planStatus},
 				}))
@@ -450,8 +555,7 @@ func App(props tuix.Props) tuix.Element {
 				}),
 				components.Input(
 					">",
-					"_",
-					focusPrompt,
+					focusPrompt && !furtherInstructionsMode,
 					prompt,
 					func(value string) {
 						setNotification(
@@ -505,6 +609,7 @@ func App(props tuix.Props) tuix.Element {
 					"branch":                runtime.Workspace.GetCurrentBranch(),
 					"hasUncommittedChanges": runtime.Workspace.HasUncommittedChanges(),
 					"activeSkill":           activeSkillName,
+					"lastCompaction":        lastCompaction,
 				},
 			}))
 

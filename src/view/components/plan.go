@@ -43,12 +43,20 @@ func PlanView(props tuix.Props) tuix.Element {
 	for i, s := range plan.Steps {
 		marker, style := stepGlyph(s.Status)
 		rows = append(rows, tuix.Box(
-			tuix.Props{Direction: tuix.Row, Gap: 1},
+			tuix.Props{Direction: tuix.Row, Width: tuix.Fit()},
 			tuix.NewStyle(),
-			tuix.Text(marker, style),
-			tuix.Text(
-				fmt.Sprintf("%d. %s", i+1, s.Outline),
-				stepLabelStyle(s.Status),
+			tuix.Box(
+				tuix.Props{Width: tuix.Fixed(4)},
+				tuix.NewStyle(),
+				tuix.WrappedText(marker, style),
+			),
+			tuix.Box(
+				tuix.Props{Width: tuix.Grow(20)},
+				tuix.NewStyle(),
+				tuix.WrappedText(
+					fmt.Sprintf("%d. %s", i+1, s.Outline),
+					stepLabelStyle(s.Status),
+				),
 			),
 		))
 	}
@@ -56,7 +64,7 @@ func PlanView(props tuix.Props) tuix.Element {
 	return tuix.Box(
 		tuix.Props{Direction: tuix.Column, Padding: [4]int{0, 1, 0, 1}},
 		tuix.NewStyle().Border(tuix.Border{
-			Top: true, Bottom: true, Left: true, Right: true,
+			Top: true, Bottom: true,
 			Color: tuix.Hex("#3a3a3a"),
 		}),
 		rows...,

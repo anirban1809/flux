@@ -37,6 +37,16 @@ func ProviderView(props tuix.Props) tuix.Element {
 	valueCheckStatus, setValueCheckStatus := tuix.UseState("")
 	context := tuix.UseContext(viewctx.MainContext)
 
+	// Always construct the Input so its UseState slot is claimed on every
+	// render. tuix hooks are positional, so a conditional early-return here
+	// would shift downstream slots and corrupt sibling component state.
+	inputEl := components.Input(
+		">",
+		visible,
+		apiKeyValue,
+		func(value string) { setApiKeyValue(value) },
+	)
+
 	if !visible {
 		return view.Empty()
 	}
@@ -93,13 +103,7 @@ func ProviderView(props tuix.Props) tuix.Element {
 		view.NewLine(),
 		view.NewLine(),
 		tuix.Text("Enter API Key ", tuix.NewStyle()),
-		components.Input(
-			">",
-			"_",
-			true,
-			apiKeyValue,
-			func(value string) { setApiKeyValue(value) },
-		),
+		inputEl,
 		view.NewLine(),
 		tuix.If(
 			valueCheck,
