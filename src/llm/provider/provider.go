@@ -13,6 +13,7 @@ const (
 	OpenAIProvider        ProviderName = "OpenAI"
 	AnthropicProvider     ProviderName = "Anthropic"
 	OpenRouterAPIProvider ProviderName = "OpenRouter"
+	BedrockProvider       ProviderName = "Bedrock"
 )
 
 func GetSupportedProviders() []ProviderName {
@@ -20,6 +21,7 @@ func GetSupportedProviders() []ProviderName {
 		OpenAIProvider,
 		OpenRouterAPIProvider,
 		AnthropicProvider,
+		BedrockProvider,
 	}
 }
 
@@ -36,6 +38,10 @@ func GetProviderEnvVar(provider ProviderName) (string, error) {
 		return "ANTHROPIC_API_KEY", nil
 	}
 
+	if provider == BedrockProvider {
+		return "BEDROCK_API_KEY", nil
+	}
+
 	return "", errors.New("unsupported provider")
 }
 
@@ -47,6 +53,8 @@ func GetProviderName(provider string) (ProviderName, error) {
 		return AnthropicProvider, nil
 	case "openrouter":
 		return OpenRouterAPIProvider, nil
+	case "bedrock":
+		return BedrockProvider, nil
 	}
 
 	return "", errors.New("unsupported provider")

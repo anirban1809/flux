@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- AWS Bedrock provider with full Converse API support, streaming, SigV4 auth, and model listing (`src/llm/provider/bedrock.go`, `src/llm/provider/provider.go`, `src/llm/provider/registry.go`)
+- `git` tool definition with JSON schema for structured git operations (`src/tools/git.go`, `src/tools/git/git.json`, `src/tools/git/git.py`)
+
+### Changed
+- System prompt now instructs the agent to use `git` tool instead of `bash_tool` for git commands (`src/llm/prompts/mainprompt.go`)
+- Banner version display is now dynamic, reading from `config.Cfg.AppVersion` instead of a hardcoded string (`src/view/components/banner.go`)
+- Default `AppVersion` in config bumped to `0.0.3` (`src/config/config.go`)
+
+### Fixed
+- Prevent form submission when prompt is empty (`src/view/app.go`)
+
 ## [0.0.3] - 2026-05-24
 
 ### Added

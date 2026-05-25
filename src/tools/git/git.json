@@ -1,0 +1,25 @@
+{
+  "type": "function",
+  "function": {
+    "name": "git",
+    "description": "Execute git operations in the workspace repository. Use for all version control tasks: checking status, staging files, committing, viewing diffs, browsing history, managing branches, stashing, etc. Prefer this over the bash tool for any git command.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "A short description of the git operation being performed"
+        },
+        "command": {
+          "type": "string",
+          "description": "The git subcommand and arguments (e.g. 'status', 'diff HEAD', 'log --oneline -10', 'add src/main.go', 'commit -m \"fix: handle edge case\"'). Do not include the 'git' prefix."
+        },
+        "working_directory": {
+          "type": "string",
+          "description": "Path to the git repository root (or any subdirectory within it)"
+        }
+      },
+      "required": ["message", "command", "working_directory"]
+    }
+  }
+}

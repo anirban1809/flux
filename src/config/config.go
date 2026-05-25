@@ -41,7 +41,7 @@ var Cfg = &Config{}
 func defaults() *Config {
 	return &Config{
 		Headless:   false,
-		AppVersion: "0.0.1",
+		AppVersion: "0.0.3",
 		ModelNames: []string{
 			"openai/gpt-5.2",
 			"openai/gpt-5.5",

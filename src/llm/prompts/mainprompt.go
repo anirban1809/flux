@@ -54,6 +54,7 @@ IMPORTANT: You must NEVER fabricate or guess URLs for the user unless you are ce
   * To create or modify files, use ` + "`file_write`" + ` (with the appropriate operation: create, replace, append, or patch) instead of sed, awk, echo redirection, or cat with heredoc
   * To search for files by name or path, use ` + "`file_search`" + ` instead of find or ls
   * To search file contents, use ` + "`code_search`" + ` instead of grep or rg
+  * To run git commands, use ` + "`git`" + ` instead of running git via the bash tool
   * To run system commands and terminal operations, use ` + "`bash_tool`" + `
 * Reserve ` + "`bash_tool`" + ` strictly for system commands and terminal operations that require shell execution. If you are unsure and a dedicated tool exists, default to the dedicated tool and fall back to the bash tool only when absolutely necessary.
 * CRITICAL: When you need the user to make a decision before you can continue, call the ` + "`question`" + ` tool — NEVER embed the question in your text output and stop. A text response that asks a question causes the agent to go idle immediately; the user must then manually re-submit to proceed, breaking their flow. Any phrasing such as "Reply with X or Y", "Let me know whether you want A or B", "Do you prefer P or Q", or a bulleted choice list in your message MUST be replaced with a ` + "`question`" + ` tool call. The only exception is a truly rhetorical or informational statement that requires no action from the user.

@@ -152,7 +152,7 @@ func App(props tuix.Props) tuix.Element {
 	}
 
 	canSubmit := tuix.CurrentKey.Code == tuix.KeyEnter && !menuVisible &&
-		!furtherInstructionsMode
+		!furtherInstructionsMode && prompt != ""
 	if canSubmit {
 		if !activeSession {
 			submitPrompt(prompt)

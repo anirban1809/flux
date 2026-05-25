@@ -1,6 +1,11 @@
 package view
 
-import "github.com/anirban1809/tuix/tuix"
+import (
+	"flux/src/config"
+	"fmt"
+
+	"github.com/anirban1809/tuix/tuix"
+)
 
 func Banner(props tuix.Props) tuix.Element {
 	return tuix.Box(
@@ -8,7 +13,10 @@ func Banner(props tuix.Props) tuix.Element {
 			Direction: tuix.Column,
 		},
 		tuix.NewStyle().Foreground(tuix.Hex("#a2a2a2")),
-		tuix.Text("Flux 0.0.2", tuix.NewStyle()),
+		tuix.Text(
+			fmt.Sprintf("Flux v%s", config.Cfg.AppVersion),
+			tuix.NewStyle(),
+		),
 		tuix.Text("Press / for options", tuix.NewStyle()),
 	)
 }

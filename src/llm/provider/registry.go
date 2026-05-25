@@ -9,6 +9,7 @@ func NewRegistry() Registry {
 		OpenAIProvider:        &OpenAI{},
 		OpenRouterAPIProvider: &OpenRouterProvider{},
 		AnthropicProvider:     &Anthropic{},
+		BedrockProvider:       &Bedrock{},
 	}
 
 	return Registry{
@@ -21,7 +22,7 @@ func (r Registry) GetProvider(name ProviderName) Provider {
 }
 
 func (r Registry) ProviderList() []ProviderName {
-	return []ProviderName{OpenAIProvider, OpenRouterAPIProvider, AnthropicProvider}
+	return []ProviderName{OpenAIProvider, OpenRouterAPIProvider, AnthropicProvider, BedrockProvider}
 }
 
 func (r Registry) ContextWindowFor(providerName ProviderName, modelID string) int {
