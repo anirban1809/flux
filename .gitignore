@@ -11,4 +11,5 @@ features
 .vscode
 
 benchmark/
-*.pyc
+*.pycelectron/node_modules/
+node_modules

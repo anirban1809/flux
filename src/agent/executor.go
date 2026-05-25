@@ -41,7 +41,7 @@ func (e *Executor) IsPlanTool(name string) bool {
 
 func NewExecutor(systemPrompt string, tools []tools.Tool) *Executor {
 	return &Executor{
-		EventChannel:   make(chan events.ResponseEvent),
+		EventChannel:   make(chan events.ResponseEvent, 512),
 		MessageChannel: make(chan string),
 		SystemPrompt:   systemPrompt,
 	}
@@ -178,17 +178,21 @@ func (e *Executor) pushEvent(eventType events.ResponseEventType, value string) {
 	if config.Cfg.Headless {
 		return
 	}
-
-	events.EventManager.WriteToChannel(
-		events.AGENT_OUTPUT_CHANNEL,
-		events.ResponseEvent{
-			EventType:    eventType,
-			Message:      secrets.RedactForDisplay(value),
-			SubAgent:     e.SubAgentRunning,
-			SubAgentName: e.SubAgent,
-			SkillName:    e.ActiveSkill,
-		},
-	)
+	event := events.ResponseEvent{
+		EventType:    eventType,
+		Message:      secrets.RedactForDisplay(value),
+		SubAgent:     e.SubAgentRunning,
+		SubAgentName: e.SubAgent,
+		SkillName:    e.ActiveSkill,
+	}
+	if config.Cfg.DaemonMode {
+		select {
+		case e.EventChannel <- event:
+		default:
+		}
+		return
+	}
+	events.EventManager.WriteToChannel(events.AGENT_OUTPUT_CHANNEL, event)
 }
 
 func GetTool(path string, toolname string) (tools.Tool, error) {
@@ -372,7 +376,7 @@ func (e *Executor) ProcessToolCall(
 
 		}
 
-		if config.Cfg.Headless || config.Cfg.YoloMode {
+		if config.Cfg.Headless || config.Cfg.YoloMode || config.Cfg.DaemonMode {
 			msg = "Yes"
 		} else {
 			events.EventManager.WriteToChannel(
@@ -426,11 +430,11 @@ func (e *Executor) ProcessToolCall(
 		}, nil
 
 	case "question":
-		if config.Cfg.Headless {
+		if config.Cfg.Headless || config.Cfg.DaemonMode {
 			return &ToolResultRequestData{
 				ToolCallID: input.Id,
 				Role:       "tool",
-				Content:    `{"error":"question tool is not available in headless mode"}`,
+				Content:    `{"error":"question tool is not available in this mode"}`,
 			}, nil
 		}
 

@@ -1,14 +1,17 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"flux/src/agent"
+	"flux/src/api"
 	"flux/src/config"
 	"flux/src/events"
 	llm "flux/src/llm/provider"
@@ -39,6 +42,8 @@ func main() {
 		maxTurnsFlag  int
 		debugFlag     bool
 		yoloflag      bool
+		daemonFlag    bool
+		portFlag      int
 	)
 	flag.StringVar(
 		&promptFlag,
@@ -86,7 +91,24 @@ func main() {
 		"auto-accept all file changes without prompting",
 	)
 	flag.BoolVar(&yoloflag, "y", false, "alias for --yolo")
+	flag.BoolVar(
+		&daemonFlag,
+		"daemon",
+		false,
+		"run as HTTP API daemon (consumed by the Electron app)",
+	)
+	flag.IntVar(
+		&portFlag,
+		"port",
+		7701,
+		"port to listen on in daemon mode",
+	)
 	flag.Parse()
+
+	if daemonFlag {
+		runDaemon(portFlag, workspaceFlag, debugFlag)
+		return
+	}
 
 	if promptFlag != "" {
 		runHeadless(
@@ -118,6 +140,20 @@ func main() {
 			},
 		},
 	)
+}
+
+func runDaemon(port int, _ string, debug bool) {
+	if debug {
+		setupDebugLog()
+	}
+	config.Cfg.DaemonMode = true
+	config.Cfg.DaemonPort = port
+
+	srv := api.NewServer(port)
+	fmt.Printf("flux daemon listening on http://127.0.0.1:%d\n", port)
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("daemon error: %v", err)
+	}
 }
 
 func setupDebugLog() {

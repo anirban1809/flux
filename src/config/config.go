@@ -14,6 +14,8 @@ import (
 type Config struct {
 	Headless              bool              `toml:"headless"`
 	YoloMode              bool              `toml:"-"` // session-only, never persisted
+	DaemonMode            bool              `toml:"-"` // session-only, never persisted
+	DaemonPort            int               `toml:"-"` // session-only, never persisted
 	AppVersion            string            `toml:"app_version"`
 	ModelNames            []string          `toml:"model_names"`
 	CurrentModel          string            `toml:"current_model"`
